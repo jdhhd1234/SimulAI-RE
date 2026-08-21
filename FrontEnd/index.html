@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>초간단 시뮬레이션 엔진</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main class="container">
+        <h1>초간단 시뮬레이션</h1>
+        <p class="description">값을 입력하고 Python 시뮬레이션을 실행하세요.</p>
+
+        <form id="simulation-form">
+            <label for="input-value-factories">공장수 입력</label>
+            <input id="input-value-factories" name="factories" type="number" value="10" required>
+
+            <label for="input-value-population">인구수 입력</label>
+            <input id="input-value-population" name="population" type="number" value="10" required>
+
+            <label for="input-value-resource">자원 개수 입력</label>
+            <input id="input-value-resource" name="resource" type="number" value="10" required>
+
+            <button type="submit">시뮬레이션 실행</button>
+        </form>
+
+        <section class="result-box" aria-live="polite">
+            <h2>결과</h2>
+            <p id="status">아직 실행하지 않았습니다.</p>
+            <pre id="result">-</pre>
+        </section>
+    </main>
+
+    <script src="main.js"></script>
+</body>
+</html>
