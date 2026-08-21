@@ -14,9 +14,30 @@ form.addEventListener("submit", async (event) => {
         population: Number(inputPopulation.value),
         resource: Number(inputResource.value)
     };
+    console.log(requestData);
 
     status.textContent = "Python API에 요청 중입니다...";
     result.textContent = JSON.stringify(requestData, null, 2);
+
+    try {
+        const response_check = await fetch("http://127.0.0.1:8000/check", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(requestData)
+        });
+
+        if (!response_check.ok) {
+            throw new Error("First Check Error.");
+        }
+
+        const checkData = await response_check.json();
+        console.log(checkData);
+        result.textContent = JSON.stringify(checkData, null, 2);
+    } catch (error) {
+        status.textContent = "Python API에 연결하지 못했습니다. 요청 데이터만 표시합니다.";
+    }
 
     try {
         const response = await fetch("http://127.0.0.1:8000/main", {
@@ -32,12 +53,9 @@ form.addEventListener("submit", async (event) => {
             
         }
 
-        if (response.ok) {
-            const data = await response.json();
+        const data = await response.json();
 
-            console.log(data);
-            result.textContent = JSON.stringify(data, null, 2);
-        }
+        console.log(data);
 
         status.textContent = "시뮬레이션이 완료되었습니다.";
         result.textContent = JSON.stringify(data, null, 2);
