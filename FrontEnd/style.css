@@ -60,7 +60,35 @@ button:hover {
     color: #4b5563;
 }
 
-pre {
-    margin-bottom: 0;
-    white-space: pre-wrap;
+.chart-grid {
+    display: grid;
+    gap: 18px;
+}
+
+.chart-card {
+    padding: 16px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+}
+
+.chart-card h3 {
+    margin: 0 0 12px;
+    font-size: 17px;
+}
+
+.chart-container {
+    position: relative;
+    height: 300px;
+}
+
+@media (max-width: 560px) {
+    .container {
+        margin: 24px auto;
+        padding: 20px;
+    }
+
+    .chart-container {
+        height: 240px;
+    }
 }

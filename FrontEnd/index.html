@@ -12,14 +12,17 @@
         <p class="description">값을 입력하고 Python 시뮬레이션을 실행하세요.</p>
 
         <form id="simulation-form">
-            <label for="input-value-factories">공장수 입력</label>
-            <input id="input-value-factories" name="factories" type="number" value="10" required>
-
             <label for="input-value-population">인구수 입력</label>
-            <input id="input-value-population" name="population" type="number" value="10" required>
+            <input id="input-value-population" name="population" type="number" min="0" step="1" value="100" required>
 
             <label for="input-value-resource">자원 개수 입력</label>
-            <input id="input-value-resource" name="resource" type="number" value="10" required>
+            <input id="input-value-resource" name="resource" type="number" min="0" step="0.1" value="100" required>
+
+            <label for="input-value-product-price">제품 판매 가격 입력</label>
+            <input id="input-value-product-price" name="product_price" type="number" min="0" step="0.1" value="10" required>
+
+            <label for="input-value-buy-expense">자원 구입 가격 입력</label>
+            <input id="input-value-buy-expense" name="buy_expense" type="number" min="0.01" step="0.1" value="2" required>
 
             <button type="submit">시뮬레이션 실행</button>
         </form>
@@ -27,10 +30,26 @@
         <section class="result-box" aria-live="polite">
             <h2>결과</h2>
             <p id="status">아직 실행하지 않았습니다.</p>
-            <pre id="result">-</pre>
+
+            <div class="chart-grid">
+                <article class="chart-card">
+                    <h3>재무 결과</h3>
+                    <div class="chart-container">
+                        <canvas id="finance-chart"></canvas>
+                    </div>
+                </article>
+
+                <article class="chart-card">
+                    <h3>생산 및 수요</h3>
+                    <div class="chart-container">
+                        <canvas id="operations-chart"></canvas>
+                    </div>
+                </article>
+            </div>
         </section>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="main.js"></script>
 </body>
 </html>
