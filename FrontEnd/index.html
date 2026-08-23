@@ -3,54 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>초간단 시뮬레이션 엔진</title>
+    <title>시뮬레이션 스튜디오</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <main class="container">
-        <h1>초간단 시뮬레이션</h1>
-        <p class="description">값을 입력하고 Python 시뮬레이션을 실행하세요.</p>
-
-        <form id="simulation-form">
-            <label for="input-value-cash-init">초기 현금 입력</label>
-            <input id="input-value-cash-init" name="cash_init" type="number" min="0" step="0.1" value="10000" required>
-
-            <label for="input-value-debt-init">초기 부채 입력</label>
-            <input id="input-value-debt-init" name="debt_init" type="number" min="0" step="0.1" value="2000" required>
-
-            <label for="input-value-sell-price">제품 판매 가격 입력</label>
-            <input id="input-value-sell-price" name="sell_price" type="number" min="0.01" step="0.01" value="500" required>
-
-            <label for="input-value-deltatime">delta Time 입력</label>
-            <input id="input-value-deltatime" name="deltatime" type="number" min="0.01" step="0.01" value="0.1" required>
-
-            <label for="input-value-stoptime">stoptime 입력</label>
-            <input id="input-value-stoptime" name="stoptime" type="number" min="0.01" step="0.01" value="5" required>
-
-            <button type="submit">시뮬레이션 실행</button>
-        </form>
-
-        <section class="result-box" aria-live="polite">
-            <h2>결과</h2>
-            <p id="status">아직 실행하지 않았습니다.</p>
-
-            <div class="chart-grid">
-                <article class="chart-card">
-                    <h3>재무 결과</h3>
-                    <div class="chart-container">
-                        <canvas id="finance-chart"></canvas>
-                    </div>
-                </article>
-
-                <article class="chart-card">
-                    <h3>생산 결과</h3>
-                    <div class="chart-container">
-                        <canvas id="operations-chart"></canvas>
-                    </div>
-                </article>
+    <div class="page-shell">
+        <header class="hero">
+            <div class="hero-copy">
+                <p class="eyebrow">모델 시뮬레이션</p>
+                <h1>모델을 고르고, 값을 넣고, 결과를 확인하세요.</h1>
+                <p class="description">
+                    받아온 모델 목록과 입력 항목을 바탕으로, 화면이 자동으로 구성됩니다.
+                </p>
+                <p class="description">
+                    참고로 달러기반 입니다.
+                </p>
             </div>
-        </section>
-    </main>
+            <div class="hero-badge" aria-hidden="true">
+                <span>즉시 확인</span>
+                <strong>결과 화면</strong>
+            </div>
+        </header>
+
+        <main class="dashboard">
+            <section class="panel panel--controls" aria-labelledby="controls-title">
+                <div class="panel-heading">
+                    <div>
+                        <p class="section-kicker">모델 선택</p>
+                        <h2 id="controls-title">시뮬레이션 설정</h2>
+                    </div>
+                    <button id="refresh-models" class="ghost-button" type="button">모델 새로고침</button>
+                </div>
+
+                <div class="field-group">
+                    <label for="model-select">모델</label>
+                    <select id="model-select" disabled>
+                        <option>모델을 불러오는 중...</option>
+                    </select>
+                </div>
+
+                <div id="model-meta" class="model-meta muted" aria-live="polite"></div>
+
+                <form id="simulation-form" novalidate>
+                    <div id="schema-fields" class="schema-fields">
+                        <div class="empty-state">모델을 선택하면 입력 항목이 표시됩니다.</div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button id="run-button" class="primary-button" type="submit" disabled>시뮬레이션 실행</button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="panel panel--results" aria-labelledby="results-title" aria-live="polite">
+                <div class="panel-heading">
+                    <div>
+                        <p class="section-kicker">결과</p>
+                        <h2 id="results-title">차트 출력</h2>
+                    </div>
+                    <span id="status-pill" class="status-pill status-pill--idle">대기 중</span>
+                </div>
+
+                <p id="status" class="status-text">모델을 선택하고 값을 조정한 뒤 실행하세요.</p>
+
+                <div id="result-meta" class="result-meta"></div>
+
+                <div id="chart-grid" class="chart-grid">
+                    <div class="empty-state empty-state--large">아직 실행된 시뮬레이션이 없습니다.</div>
+                </div>
+            </section>
+        </main>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="main.js"></script>
