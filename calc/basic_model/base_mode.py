@@ -1,8 +1,6 @@
 import numpy as np
 import pandas as pd
 
-import random
-
 from BPTK_Py import Model
 from BPTK_Py import sd_functions as sd
 
@@ -13,10 +11,10 @@ from BPTK_Py import sd_functions as sd
 4. 고정된 설정값은 무엇인가? → Constant
 """
 
-def market_demand(start: int, end: int):
-    return random.randrange(start, end)
+'''def market_demand(start: int, end: int):
+    return random.randrange(start, end)'''
 
-class InitValue:
+class MainModel:
     def __init__(
         self,
         cash_init,
@@ -33,8 +31,8 @@ class InitValue:
         self.sell_price = sell_price     # 판매가격
         self.labor_count = labor_count   # 노동자수
         self.deltatime = deltatime       # 델타타임
-        self.stoptime = stoptime         # 멈추는 타이밍
-        
+        self.stoptime = stoptime         # 멈추는 타이밍    
+    
     
     def CompanyModel(self):
         """기업경제시뮬(중형) 150줄 넘어가면 분리(지금 75줄)"""
@@ -124,7 +122,7 @@ class InitValue:
 
 if __name__ == "__main__":
     
-    sim_data = InitValue(
+    sim_data = MainModel(
         cash_init=1000.0, 
         debt_init=2000.0, 
         origin_price=250.0,
