@@ -12,17 +12,20 @@
         <p class="description">값을 입력하고 Python 시뮬레이션을 실행하세요.</p>
 
         <form id="simulation-form">
-            <label for="input-value-population">인구수 입력</label>
-            <input id="input-value-population" name="population" type="number" min="0" step="1" value="100" required>
+            <label for="input-value-cash-init">초기 현금 입력</label>
+            <input id="input-value-cash-init" name="cash_init" type="number" min="0" step="0.1" value="10000" required>
 
-            <label for="input-value-resource">자원 개수 입력</label>
-            <input id="input-value-resource" name="resource" type="number" min="0" step="0.1" value="100" required>
+            <label for="input-value-debt-init">초기 부채 입력</label>
+            <input id="input-value-debt-init" name="debt_init" type="number" min="0" step="0.1" value="2000" required>
 
-            <label for="input-value-product-price">제품 판매 가격 입력</label>
-            <input id="input-value-product-price" name="product_price" type="number" min="0" step="0.1" value="10" required>
+            <label for="input-value-sell-price">제품 판매 가격 입력</label>
+            <input id="input-value-sell-price" name="sell_price" type="number" min="0.01" step="0.01" value="500" required>
 
-            <label for="input-value-buy-expense">자원 구입 가격 입력</label>
-            <input id="input-value-buy-expense" name="buy_expense" type="number" min="0.01" step="0.1" value="2" required>
+            <label for="input-value-deltatime">delta Time 입력</label>
+            <input id="input-value-deltatime" name="deltatime" type="number" min="0.01" step="0.01" value="0.1" required>
+
+            <label for="input-value-stoptime">stoptime 입력</label>
+            <input id="input-value-stoptime" name="stoptime" type="number" min="0.01" step="0.01" value="5" required>
 
             <button type="submit">시뮬레이션 실행</button>
         </form>
@@ -40,7 +43,7 @@
                 </article>
 
                 <article class="chart-card">
-                    <h3>생산 및 수요</h3>
+                    <h3>생산 결과</h3>
                     <div class="chart-container">
                         <canvas id="operations-chart"></canvas>
                     </div>

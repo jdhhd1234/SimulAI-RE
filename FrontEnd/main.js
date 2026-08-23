@@ -1,8 +1,9 @@
 const form = document.querySelector("#simulation-form");
-const inputPopulation = document.querySelector("#input-value-population");
-const inputResource = document.querySelector("#input-value-resource");
-const inputProductPrice = document.querySelector("#input-value-product-price");
-const inputBuyExpense = document.querySelector("#input-value-buy-expense");
+const inputCashInit = document.querySelector("#input-value-cash-init");
+const inputDebtInit = document.querySelector("#input-value-debt-init");
+const inputSellPrice = document.querySelector("#input-value-sell-price");
+const inputDeltaTime = document.querySelector("#input-value-deltatime")
+const inputStopTime = document.querySelector("#input-value-stoptime")
 
 const status = document.querySelector("#status");
 const financeCanvas = document.querySelector("#finance-chart");
@@ -73,8 +74,13 @@ function renderCharts(results) {
                 ),
                 createLineDataset(
                     "누적 이익",
-                    results.map((item) => item.profit),
+                    results.map((item) => item.final_profit),
                     "#16a34a"
+                ),
+                createLineDataset(
+                    "부채",
+                    results.map((item) => item.debt),
+                    "#dc2626"
                 )
             ]
         },
@@ -99,29 +105,14 @@ function renderCharts(results) {
             labels,
             datasets: [
                 createLineDataset(
-                    "원자재",
-                    results.map((item) => item.raw_material),
+                    "제품 수량",
+                    results.map((item) => item.product_count),
                     "#a16207"
                 ),
                 createLineDataset(
-                    "제품",
-                    results.map((item) => item.products),
+                    "제품 판매 가격",
+                    results.map((item) => item.sell_price),
                     "#7c3aed"
-                ),
-                createLineDataset(
-                    "수요",
-                    results.map((item) => item.demand),
-                    "#dc2626"
-                ),
-                createLineDataset(
-                    "생산량",
-                    results.map((item) => item.production),
-                    "#0891b2"
-                ),
-                createLineDataset(
-                    "판매량",
-                    results.map((item) => item.sales),
-                    "#ea580c"
                 )
             ]
         },
@@ -133,7 +124,7 @@ function renderCharts(results) {
                     ...sharedOptions.scales.y,
                     title: {
                         display: true,
-                        text: "수량"
+                        text: "값"
                     }
                 }
             }
@@ -145,10 +136,11 @@ form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const requestData = {
-        population: Number(inputPopulation.value),
-        resource: Number(inputResource.value),
-        product_price: Number(inputProductPrice.value),
-        buy_expense: Number(inputBuyExpense.value)
+        cash_init: Number(inputCashInit.value),
+        debt_init: Number(inputDebtInit.value),
+        sell_price: Number(inputSellPrice.value),
+        deltatime: Number(inputDeltaTime.value),
+        stoptime: Number(inputStopTime.value)
     };
 
     status.textContent = "Python API에 요청 중입니다...";
@@ -173,6 +165,8 @@ form.addEventListener("submit", async (event) => {
         status.textContent = "시뮬레이션이 완료되었습니다.";
     } catch (error) {
         destroyCharts();
-        status.textContent = "시뮬레이션 요청에 실패했습니다.";
+        const message = error instanceof Error ? error.message : String(error);
+        console.error("시뮬레이션 요청 오류:", error);
+        status.textContent = `시뮬레이션 요청에 실패했습니다. (${message})`;
     }
 });
