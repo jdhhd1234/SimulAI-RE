@@ -55,31 +55,15 @@ class CompanyModel:
     def _create_workforce_section(self, model):
         # 취업 해고 고용관련
         workers = model.stock("workers") # 근로자 수
-        workers.initial_value = float(self.workers)
+        workers.initial_value = self.workers
 
-        ## 고용은 주문많아질수록 고용
+        ## 고용은 주문많아질수록 고용 생산성 늘릴떄 고용
         hiring = model.flow("hiring")  # 고용
         
         ## 해고는 부채가 너무 심각할떄 그리고 계속 적자일떄
         layoffs = model.flow("layoffs") # 해고
 
         return workers, hiring, layoffs
-
-    def _connect_workforce_section(
-        self,
-        workers,
-        hiring,
-        layoffs,
-        profit,
-        debt
-    ):
-        ## 공식은 일단 단순히 부채보다 많으면 하는걸로 일단 단순히
-        hiring.equation = profit > debt
-
-        ## 해고는 적자에다가 부채까지 많으면 하는걸로 일단 단순히
-        layoffs.equation = profit < debt
-
-        workers.equation = hiring - layoffs
 
     def _create_production_section(self, model, workers):
         # 생산관련
@@ -166,22 +150,17 @@ class CompanyModel:
         workers, hiring, layoffs = self._create_workforce_section(model)
         factory_production = self._create_production_section(model, workers)
         
-        sales = self._create_market_section(model, factory_production)
+        hiring.equation = factory_production
         
+        sales = self._create_market_section(model, factory_production)
         profit = self._create_profit_section(model, sales)
-        self._connect_workforce_section(   
-            workers,
-            hiring,
-            layoffs,
-            profit,
-            debt
-        )
         cash.equation = profit
 
         return model
         
 
-def mainRun():
+def mainRun(Pretty: bool):
+    maindata = []
     sim_data = CompanyModel(
         cash_init=1000.0, 
         origin_price=250.0,
@@ -202,8 +181,25 @@ def mainRun():
         "revenue"
     ])
     
-    return df
+    for time, row in df.iterrows():
+        maindata.append({
+            "time": float(time),
+            "cash": float(row["cash"]),
+            "debt": float(row["debt"]),
+            "workers": float(row["workers"]),
+            "profit": float(row["profit"]),
+            "revenue": float(row["revenue"]),
+        })
+        
+    if Pretty is True:
+        return df.reset_index().to_json(
+            orient="records",
+            indent=2,
+            force_ascii=False,
+        )
+    
+    return maindata
+
 
 if __name__ == "__main__":
-    data = mainRun()
-    print(data)
+    print(mainRun(True))

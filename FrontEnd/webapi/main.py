@@ -1,9 +1,10 @@
 from pathlib import Path
-from typing import Any
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+
+import calc.basic_model.base_mode as bm
 
 app = FastAPI()
 app.add_middleware(
@@ -14,23 +15,11 @@ app.add_middleware(
 )
 
 #uvicorn FrontEnd.webapi.main:app --reload
-data: dict[str, Any] = {
-    "cash": 1000,
-    "workers": 120,
-    "sales": 350,
-    "profit": 500,
-}
+data = bm.mainRun(False)
 
 
 @app.get("/data")
 def get_data():
-    return {"message": "Hello WOrld"}
-
-
-@app.post("/data")
-def set_data(new_data: dict[str, Any]) -> dict[str, Any]:
-    data.clear()
-    data.update(new_data)
     return data
 
 
