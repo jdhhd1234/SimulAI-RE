@@ -130,6 +130,7 @@ class CompanyModel:
         profit = model.converter("profit")
         profit.equation = (
             revenue
+            - sales * self.origin_price
             - research_cost
             - marketing_cost
             - wage_cost
@@ -150,7 +151,9 @@ class CompanyModel:
         workers, hiring, layoffs = self._create_workforce_section(model)
         factory_production = self._create_production_section(model, workers)
         
-        hiring.equation = factory_production
+        # 고용 로직은 나중에 개선
+        # 현재는 기업 모델 단순화를 위해 고용 중지
+        hiring.equation = 0
         
         sales = self._create_market_section(model, factory_production)
         profit = self._create_profit_section(model, sales)
