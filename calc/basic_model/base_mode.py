@@ -16,11 +16,10 @@ from BPTK_Py import sd_functions as sd
 '''def market_demand(start: int, end: int):
     return random.randrange(start, end)'''
 
-class MainModel:
+class CompanyModel:
     def __init__(
         self,
         cash_init,
-        debt_init,
         workers,
         origin_price,
         sell_price,
@@ -28,21 +27,23 @@ class MainModel:
         stoptime
     ):
         self.cash_init = cash_init       # 현금보유 초기 가격
-        self.debt_init = debt_init       # 부채 초기 가격
+        self.debt_init = 0.0               # 부채 초기 가격
 
-        self.workers = workers
+        self.workers = workers           # 근로자 몇명인지
 
         self.origin_price = origin_price # 원가격 즉 생산하는데 쓰인 값
         self.sell_price = sell_price     # 판매가격
 
         self.deltatime = deltatime       # 델타타임
-        self.stoptime = stoptime         # 멈추는 타이밍    
-
+        self.stoptime = stoptime         # 멈추는 타이밍
+        
+        self.consumption = np.random.randint(1, 1000) # 소비 / 일단 랜덤으로 한다. 나중에는 ABM으로 처리
+        
     def _create_cash_section(self, model):
         # 현금관련 메인쪽
         cash = model.stock("cash")
         debt = model.stock("debt")
-
+        
         cash.initial_value = self.cash_init
         debt.initial_value = self.debt_init
 
@@ -56,8 +57,10 @@ class MainModel:
         workers = model.stock("workers") # 근로자 수
         workers.initial_value = float(self.workers)
 
-        ## 고용은 회사이익이 늘어나면 늘어 날수록 그리고 주문많아질수록 고용
+        ## 고용은 주문많아질수록 고용
         hiring = model.flow("hiring")  # 고용
+        
+        ## 해고는 부채가 너무 심각할떄 그리고 계속 적자일떄
         layoffs = model.flow("layoffs") # 해고
 
         return workers, hiring, layoffs
@@ -85,7 +88,8 @@ class MainModel:
         ## 생산량은 실판매가 얼마 됐는지에 따라서 조절한다
         factory_production = model.flow("factory_production") # 생산량
 
-        ## self.labor_count / x 여기서 X가 공장수임 공장수는 이익보고 따져야 하는데 일단 이렇게 x로 한다
+        ## 'self.labor_count / x' 여기서 X가 공장수임 공장수는 이익 수요을 보고 따져야 하는데 일단 이렇게 x로 한다
+        ## 겪고있는 문제: 생산량과 수익에 관련하여 어떻게 공장갯수를 정하는가?
         factory_count.equation = workers / 100
 
         ## 기업이 몇게 생산할껀지 공식
@@ -99,16 +103,13 @@ class MainModel:
         # 판매 수요 관련 / 시장
         inventory = model.stock("inventory") # 재고
 
-        ## 현재 제고
-        inventory.equation = factory_production
-        print("인벤", inventory)
-
         demand = model.converter("demand") # 수요
-        sales = model.flow("sales") # 판매요구
+        sales = model.flow("sales")        # 실제 팔린거
 
-        ## 수요 공식 / 일단 임시로 500고정 / 500이 고객임
+        ## 수요 공식
         ## 나중에 이건 ABM으로 뺼 예정
-        demand.equation = random.randint(1, 1500)
+        ## 일단 지금은 random쓴다
+        demand.equation = self.consumption
 
         ## 판매 재고 공식 / 판매는 / 판매 = 수요
         sales.equation = sd.min(demand, inventory)
@@ -178,24 +179,14 @@ class MainModel:
         cash.equation = profit
 
         return model
+        
 
-'''    def countryEcnomic(self):
-        """이거는 국가경제시뮬레이션"""
-        model_country = Model(  
-            starttime=0.0,
-            stoptime=self.stoptime,
-            dt=self.deltatime,
-            name="country Model",
-        )'''
-
-if __name__ == "__main__":
-    
-    sim_data = MainModel(
+def mainRun():
+    sim_data = CompanyModel(
         cash_init=1000.0, 
-        debt_init=2000.0, 
         origin_price=250.0,
-        sell_price=500.0,
-        workers=120,
+        sell_price=500.0,  
+        workers=120.0,
         deltatime=0.1,
         stoptime=5.0
     )
@@ -204,18 +195,15 @@ if __name__ == "__main__":
     
     print("[CLI] 시뮬레이션 엔진 가동 및 결과 연산...")
     df = economic_model.simulate(equations=[
-        "cash", 
-        "debt", 
-        "cash_ratio", 
-        "factory_count",
-        "factory_production",
-        "inventory",
-        "sales",
-        "demand",
-        "revenue",
-        "research_cost",
-        "marketing_cost",
-        "wage_cost",
-        "profit"
+        "cash",
+        "debt",
+        "workers",
+        "profit",
+        "revenue"
     ])
-    print(df)
+    
+    return df
+
+if __name__ == "__main__":
+    data = mainRun()
+    print(data)
