@@ -52,16 +52,37 @@ class CompanyModel:
 
         return cash, debt
 
-    def _create_workforce_section(self, model):
+    def _create_workforce_section(self, model, debt, demand):
         # 취업 해고 고용관련
         workers = model.stock("workers") # 근로자 수
         workers.initial_value = self.workers
 
-        ## 고용은 주문많아질수록 고용 생산성 늘릴떄 고용
+        ## 고용은 주문많아질수록 생산성 늘릴떄 고용
         hiring = model.flow("hiring")  # 고용
+        
+        ## 주문이 많아지면 많아 질수록 고용은 점점 증가한다
+        hiring.equation = 10 * (demand / 100) ** 2
         
         ## 해고는 부채가 너무 심각할떄 그리고 계속 적자일떄
         layoffs = model.flow("layoffs") # 해고
+        
+        ## 주문 감소압력
+        order_shortage = sd.max(
+            (100 - demand) / 100,
+            0
+        )
+
+        ## 부채 증가 압력
+        debt_pressure = sd.max(debt / 1000, 0)
+        
+        ## 주문이 점점 적어지고 부채가 점점 증가할떄 해고는 증가한다
+        layoffs.equation = sd.min(
+            50,
+            10 * order_shortage ** 2
+            + 20 * debt_pressure ** 2
+        )
+        
+        workers.equation = hiring - layoffs
 
         return workers, hiring, layoffs
 
@@ -99,7 +120,7 @@ class CompanyModel:
         sales.equation = sd.min(demand, inventory)
         inventory.equation = factory_production - sales
 
-        return sales
+        return sales, demand
 
     def _create_profit_section(self, model, sales):
         # 수익 관련
@@ -148,15 +169,21 @@ class CompanyModel:
         )
 
         cash, debt = self._create_cash_section(model)
-        workers, hiring, layoffs = self._create_workforce_section(model)
+        
+        # 나중에 이 구조는 생각조금 해보겠음
+        demand = model.converter("demand")
+        
+        workers, hiring, layoffs = self._create_workforce_section(model, debt, demand)
         factory_production = self._create_production_section(model, workers)
         
         # 고용 로직은 나중에 개선
         # 현재는 기업 모델 단순화를 위해 고용 중지
         hiring.equation = 0
         
-        sales = self._create_market_section(model, factory_production)
+        sales, demand = self._create_market_section(model, factory_production)
         profit = self._create_profit_section(model, sales)
+        
+        ## 일단은 단순 현금은 profit와 같다로 한다
         cash.equation = profit
 
         return model
@@ -186,6 +213,7 @@ def mainRun(Pretty: bool):
     
     for time, row in df.iterrows():
         maindata.append({
+            # Time Error은 무시해도 괜찮음.
             "time": float(time),
             "cash": float(row["cash"]),
             "debt": float(row["debt"]),
