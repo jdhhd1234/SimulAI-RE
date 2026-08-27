@@ -20,7 +20,10 @@ class CompanyModel:
     def __init__(
         self,
         cash_init,
+        seed_init,
+        previous_demand,
         workers,
+        production_per_worker,
         origin_price,
         sell_price,
         deltatime,
@@ -28,14 +31,19 @@ class CompanyModel:
     ):
         self.cash_init = cash_init       # 현금보유 초기 가격
         self.debt_init = 0.0               # 부채 초기 가격
+        self.seed_init = seed_init       # Random seed초기 값
+
+        self.previous_demand = previous_demand
 
         self.workers = workers           # 근로자 몇명인지
+        self.production_per_worker = production_per_worker # 근로자 한명당 몇개 생성 하는지
 
         self.origin_price = origin_price # 원가격 즉 생산하는데 쓰인 값
         self.sell_price = sell_price     # 판매가격
 
         self.deltatime = deltatime       # 델타타임
         self.stoptime = stoptime         # 멈추는 타이밍
+
         
         self.consumption = np.random.randint(1, 1000) # 소비 / 일단 랜덤으로 한다. 나중에는 ABM으로 처리
         
@@ -52,41 +60,51 @@ class CompanyModel:
 
         return cash, debt
 
-    def _create_workforce_section(self, model, debt, demand):
+    def _create_workforce_part_hiring(self, model, demand, profit):
+        # 고용관련
+
+        ## 고용은 기본적으로 수요가 증가하고 이익이 많을떄 고용하는 흐름을 가진다
+        hiring = model.flow("hiring")  # 고용
+
+        ## 주문이 많아지면 많아 질수록 고용은 점점 증가한다
+        hiring.equation = 10 * (demand / 100) ** 2
+
+        return hiring
+
+    def _create_workforce_part_layoffs(self, model, demand, debt, profit):
+        # 해고관련
+
+        ## 해고는 기본적으로 부채가 커지고 수요가 적어지면 해고한다
+        ## 해고는 부채가 너무 심각할떄 그리고 계속 적자일떄
+        layoffs = model.flow("layoffs") # 해고
+                
+        ## 주문 감소압력
+        order_shortage = sd.max((100 - demand) / 100, 0)
+
+        ## 부채 증가 압력
+        debt_pressure = sd.max(debt / 1000, 0)
+
+        ## 주문이 점점 적어지고 부채가 점점 증가할떄 해고는 증가한다
+        layoffs.equation = sd.min(
+                    50,
+                    10 * order_shortage ** 2
+                    + 20 * debt_pressure ** 2
+                )
+
+        return layoffs
+
+    def _create_workforce_section(self, model, demand, debt, profit):
         # 취업 해고 고용관련
         workers = model.stock("workers") # 근로자 수
         workers.initial_value = self.workers
 
-        ## 고용은 주문많아질수록 생산성 늘릴떄 고용
-        hiring = model.flow("hiring")  # 고용
-        
-        ## 주문이 많아지면 많아 질수록 고용은 점점 증가한다
-        hiring.equation = 10 * (demand / 100) ** 2
-        
-        ## 해고는 부채가 너무 심각할떄 그리고 계속 적자일떄
-        layoffs = model.flow("layoffs") # 해고
-        
-        ## 주문 감소압력
-        order_shortage = sd.max(
-            (100 - demand) / 100,
-            0
-        )
-
-        ## 부채 증가 압력
-        debt_pressure = sd.max(debt / 1000, 0)
-        
-        ## 주문이 점점 적어지고 부채가 점점 증가할떄 해고는 증가한다
-        layoffs.equation = sd.min(
-            50,
-            10 * order_shortage ** 2
-            + 20 * debt_pressure ** 2
-        )
-        
+        hiring = self._create_workforce_part_hiring(model, demand, profit)
+        layoffs = self._create_workforce_part_layoffs(model, demand, debt, profit)
         workers.equation = hiring - layoffs
 
         return workers, hiring, layoffs
 
-    def _create_production_section(self, model, workers):
+    def _create_production_section(self, model, workers, demand):
         # 생산관련
         factory_count = model.converter("factory_count") # 공장수
 
@@ -100,21 +118,34 @@ class CompanyModel:
         ## 기업이 몇게 생산할껀지 공식
         ## 일단 중형에서는 1개당 300개 생산으로 고정 (매달)
         ## factory_count * x / 여기서 x도 나중에 판매량 따라서 조절
+
+        ## 2026/08/28
+        ## 이거는 수요를 보고 결정한다
         factory_production.equation = factory_count * 300
 
         return factory_production
 
+    def _create_market_demand_part(self, model):
+        previous_demand = model.converter("previous_demand") # 이전 수요 / 일단은 초기수요로 하려고 한다
+        previous_demand.equation = sd.delay(model, model.converter("demand"), 
+                                            float(self.deltatime), float(self.previous_demand))
+        return previous_demand
+
     def _create_market_section(self, model, factory_production):
-        # 판매 수요 관련 / 시장
+        # 판매 수요 관련 / 시장 previous_demand
         inventory = model.stock("inventory") # 재고
 
         demand = model.converter("demand") # 수요
         sales = model.flow("sales")        # 실제 팔린거
 
+        # 그전 수요
+        previous_demand_data = self._create_market_demand_part(model)
+
         ## 수요 공식
         ## 나중에 이건 ABM으로 뺼 예정
         ## 일단 지금은 random쓴다
-        demand.equation = self.consumption
+        # 수요 = 이전 수요의 영향 + 무작위 충격
+        demand.equation = sd.round(previous_demand_data * 0.8 + sd.normal(20.0, 5.0), 0)
 
         ## 판매 재고 공식 / 판매는 / 판매 = 수요
         sales.equation = sd.min(demand, inventory)
@@ -172,13 +203,15 @@ class CompanyModel:
         
         # 나중에 이 구조는 생각조금 해보겠음
         demand = model.converter("demand")
+        profit = model.converter("profit")
         
-        workers, hiring, layoffs = self._create_workforce_section(model, debt, demand)
-        factory_production = self._create_production_section(model, workers)
+        workers, hiring, layoffs = self._create_workforce_section(model, demand, debt, profit)
+        factory_production = self._create_production_section(model, workers, demand)
         
         # 고용 로직은 나중에 개선
         # 현재는 기업 모델 단순화를 위해 고용 중지
-        hiring.equation = 0
+
+        ## hiring는 고용이 증가하고 돈이 많을떄 한다.
         
         sales, demand = self._create_market_section(model, factory_production)
         profit = self._create_profit_section(model, sales)
@@ -193,11 +226,14 @@ def mainRun(Pretty: bool):
     maindata = []
     sim_data = CompanyModel(
         cash_init=1000.0, 
+        seed_init=12345,
+        previous_demand=random.randint(1, 1000),
         origin_price=250.0,
         sell_price=500.0,  
         workers=120.0,
-        deltatime=0.1,
-        stoptime=5.0
+        production_per_worker=10,
+        deltatime=1.0,
+        stoptime=12.0
     )
     
     economic_model = sim_data.CompanyModel()
@@ -208,7 +244,9 @@ def mainRun(Pretty: bool):
         "debt",
         "workers",
         "profit",
-        "revenue"
+        "revenue",
+        "demand",
+        "previous_demand"
     ])
     
     for time, row in df.iterrows():
@@ -220,6 +258,8 @@ def mainRun(Pretty: bool):
             "workers": float(row["workers"]),
             "profit": float(row["profit"]),
             "revenue": float(row["revenue"]),
+            "demand": float(row["demand"]),
+            "previous_demand": float(row["previous_demand"]),
         })
         
     if Pretty is True:

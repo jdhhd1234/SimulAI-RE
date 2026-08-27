@@ -23,10 +23,53 @@ h1 {
     color: #66717d;
 }
 
-#cash-chart {
+#cash-chart,
+#workers-chart,
+#demand-chart {
     margin-top: 24px;
     padding: 16px;
     border-radius: 10px;
     background: white;
     box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
+}
+
+h2 {
+    margin-top: 32px;
+}
+
+.table-wrapper {
+    overflow-x: auto;
+    margin-top: 24px;
+    background: white;
+    border: 1px solid #d9dee3;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
+}
+
+#simulation-table {
+    width: 100%;
+    min-width: 720px;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+#simulation-table th,
+#simulation-table td {
+    padding: 10px 12px;
+    border-right: 1px solid #e5e8eb;
+    border-bottom: 1px solid #e5e8eb;
+    text-align: right;
+    white-space: nowrap;
+}
+
+#simulation-table th {
+    position: sticky;
+    top: 0;
+    background: #eef2f5;
+    color: #3d4852;
+    font-weight: 600;
+}
+
+#simulation-table tbody tr:nth-child(even) {
+    background: #f8fafb;
 }
