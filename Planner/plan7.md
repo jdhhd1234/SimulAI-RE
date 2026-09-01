@@ -26,3 +26,23 @@
 3. 수요 rand seed문제
 
 다음에 할꺼 위에 그대로 한다. 요즘 시간이 좀 빠듯함
+
+## UtilityAI와 System Dynamics역할분리
+
+- UtilityAI
+1. 고용, 해고, 생산, 부채발행
+
+- System Dynamics
+1. 고용 해고 생산 제외 나머지것
+
+## UtilityAI란?
+
+Action들 중에서 특정 범위의 값을 출력하고 가장 높은걸 선택하는 AI
+
+## 부채발행 Action
+
+- 현금
+- 이익
+- 노동자수
+- 전 수요 판매량
+

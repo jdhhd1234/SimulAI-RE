@@ -47,7 +47,7 @@ class CompanyModel:
         
         self.consumption = np.random.randint(1, 1000) # 소비 / 일단 랜덤으로 한다. 나중에는 ABM으로 처리
         
-    def _create_cash_section(self, model, ):
+    def _create_cash_section(self, model):
         # 현금관련 메인쪽
         cash = model.stock("cash")
         debt = model.stock("debt")
@@ -55,7 +55,6 @@ class CompanyModel:
         cash.initial_value = self.cash_init
         
         debt.initial_value = self.debt_init
-        debt.equation = 
 
         cash_ratio = model.converter("cash_ratio")
         cash_ratio.equation = debt / sd.max(cash, 0.0001)
