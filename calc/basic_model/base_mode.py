@@ -6,6 +6,8 @@ import random
 from BPTK_Py import Model
 from BPTK_Py import sd_functions as sd
 
+import calc.agents.utilityai.company_ai as company_ai
+
 """
 1. 무엇이 쌓이는가? → Stock
 2. 무엇 때문에 늘고 줄어드는가? → Flow
@@ -63,7 +65,7 @@ class CompanyModel:
 
     def _create_workforce_part_hiring(self, model, demand, production_per_worker):
         # 고용관련
-
+        
         ## 고용은 기본적으로 수요가 증가하고 이익이 많을떄 고용하는 흐름을 가진다
         hiring = model.flow("hiring")  # 고용
 
