@@ -18,7 +18,7 @@ async function loadData() {
             data: {
                 labels: data.map((point) => point.time),
                 datasets: Object.keys(data[0])
-                    .filter((key) => !["time", "workers", "demand", "previous_demand"].includes(key))
+                    .filter((key) => !["time", "workers", "demand", "previous_demand", "ai_action"].includes(key))
                     .map((key) => ({
                         label: key,
                         data: data.map((point) => point[key]),

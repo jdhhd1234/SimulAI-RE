@@ -70,7 +70,11 @@ class CompanyModel:
         hiring = model.flow("hiring")  # 고용
 
         ## 주문이 많아지면 많아 질수록 고용은 점점 증가한다
-        hiring.equation = sd.sqrt(sd.max(0, demand - production_per_worker))
+        hiring.equation = sd.If(
+            self.utility_action == 1,
+            sd.sqrt(sd.max(0, demand - production_per_worker)),
+            0,
+        )
 
         return hiring
 
@@ -94,16 +98,58 @@ class CompanyModel:
         ## 주문이 점점 적어지고 부채가 점점 증가할떄 해고는 증가한다
         
         ## 지금 order_shortage랑 debt_pressure이 재대로 작동을 안함
-        layoffs.equation = (0.5 * order_shortage + 0.5 * debt_pressure)
+        layoffs.equation = sd.If(
+            self.utility_action == 2,
+            (0.5 * order_shortage + 0.5 * debt_pressure),
+            0,
+        )
 
         ## 일단 임시 디버깅으로 order_shortage, debt_pressure 추가
         return layoffs, order_shortage, debt_pressure
 
-    def _create_workforce_section(self, model, demand, debt, profit):
+    def _create_utility_section(self, model, demand, debt, cash, workers, profit):
+        hire_score = model.converter("hire_score")
+        layoff_score = model.converter("layoff_score")
+        production_score = model.converter("production_score")
+        debt_score = model.converter("debt_score")
+        utility_action = model.converter("utility_action")
+
+        hire_score.equation = (
+            sd.min(sd.max(demand / sd.max(workers * self.production_per_worker, 1), 0), 1)
+            + sd.min(sd.max(profit / 1000, 0), 1)
+        ) / 2
+        layoff_score.equation = (
+            sd.min(sd.max(debt / 1000, 0), 1)
+            + sd.min(sd.max(-profit / 1000, 0), 1)
+        ) / 2
+        production_score.equation = sd.min(
+            sd.max(demand / sd.max(workers * self.production_per_worker, 1), 0),
+            1,
+        )
+        debt_score.equation = (
+            sd.min(sd.max(1 - cash / 1000, 0), 1)
+            + sd.min(sd.max(-profit / 1000, 0), 1)
+            + sd.min(sd.max(demand / 1000, 0), 1)
+        ) / 3
+
+        utility_action.equation = sd.If(
+            hire_score >= sd.max(sd.max(layoff_score, production_score), debt_score),
+            1,
+            sd.If(
+                layoff_score >= sd.max(production_score, debt_score),
+                2,
+                sd.If(production_score >= debt_score, 3, 4),
+            ),
+        )
+
+        self.utility_action = utility_action
+
+    def _create_workforce_section(self, model, demand, debt, cash, profit):
         # 취업 해고 고용관련
         workers = model.stock("workers") # 근로자 수
         workers.initial_value = self.workers
 
+        self._create_utility_section(model, demand, debt, cash, workers, profit)
         hiring = self._create_workforce_part_hiring(model, demand, self.production_per_worker)
         layoffs, order_shortage, debt_pressure = self._create_workforce_part_layoffs(model, demand, debt)
         workers.equation = hiring - layoffs
@@ -213,7 +259,7 @@ class CompanyModel:
         demand = model.converter("demand")
         profit = model.converter("profit")
         
-        workers, hiring, layoffs, order_shortage, debt_pressure = self._create_workforce_section(model, demand, debt, profit)
+        workers, hiring, layoffs, order_shortage, debt_pressure = self._create_workforce_section(model, demand, debt, cash, profit)
         factory_production = self._create_production_section(model, workers)
         
         # 고용 로직은 나중에 개선
@@ -226,7 +272,7 @@ class CompanyModel:
         
         ## 일단은 단순 현금은 profit와 같다로 한다
         cash.equation = profit
-
+        
         return model
         
 
@@ -259,6 +305,7 @@ def mainRun(Pretty: bool, Integer: bool = True):
         "layoffs",
         "order_shortage",
         "debt_pressure",
+        "utility_action",
     ])
 
     if Integer is True:
@@ -282,10 +329,11 @@ def mainRun(Pretty: bool, Integer: bool = True):
             "layoffs": float(row["layoffs"]),
             "order_shortage": float(row["order_shortage"]),
             "debt_pressure": float(row["debt_pressure"]),
+            "ai_action": ["", "hire", "layoff", "production", "debt"][int(row["utility_action"])],
         })
 
     if Integer is True:
-        maindata = [{key: int(round(value)) for key, value in row.items()} for row in maindata]
+        maindata = [{key: int(round(value)) if isinstance(value, (int, float)) else value for key, value in row.items()} for row in maindata]
         
     if Pretty is True:
         return df.reset_index().to_json(
