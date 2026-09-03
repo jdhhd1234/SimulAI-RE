@@ -5,26 +5,183 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SimulAI-RE</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/geomap/geo_style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 </head>
 <body>
     <main>
-        <h1>Company Simulation Data</h1>
-        <p id="status">Loading...</p>
-        <canvas id="cash-chart"></canvas>
-        <h2>Workers</h2>
-        <canvas id="workers-chart"></canvas>
-        <h2>Demand</h2>
-        <canvas id="demand-chart"></canvas>
-        <h2>Simulation Data[DEBUG]</h2>
-        <div class="table-wrapper">
-            <table id="simulation-table">
-                <thead></thead>
-                <tbody></tbody>
-            </table>
+        <header class="dashboard-header">
+            <div>
+                <p class="eyebrow">SIMULAI-RE / WORLD ECONOMY</p>
+                <h1>Company Simulation Data</h1>
+            </div>
+            <div class="header-controls">
+                <label class="debug-toggle">
+                    <input id="debug-mode" type="checkbox">
+                    Debug mode
+                </label>
+                <p id="status">Loading...</p>
+            </div>
+        </header>
+
+        <div class="dashboard-layout">
+            <aside class="info-panel">
+                <div class="panel-heading">
+                    <p class="eyebrow">INTERNAL STATUS</p>
+                    <h2>Economic Overview</h2>
+                </div>
+
+                <div class="metric-grid">
+                    <article class="metric-card">
+                        <span>Cash</span>
+                        <strong id="metric-cash">--</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span>Profit</span>
+                        <strong id="metric-profit">--</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span>Debt</span>
+                        <strong id="metric-debt">--</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span>Workers</span>
+                        <strong id="metric-workers">--</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span>Revenue</span>
+                        <strong id="metric-revenue">--</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span>Demand</span>
+                        <strong id="metric-demand">--</strong>
+                    </article>
+                </div>
+
+                <div class="action-card">
+                    <span>Current AI Action</span>
+                    <strong id="metric-action">--</strong>
+                </div>
+
+                <section class="editor-section">
+                    <p class="eyebrow">COMPANY EDITOR</p>
+                    <h3>Add Company</h3>
+                    <p class="editor-help">Click the map to select coordinates.</p>
+                    <form id="company-form">
+                        <label>
+                            Company name
+                            <input name="name" type="text" placeholder="Example Corp" required>
+                        </label>
+                        <label>
+                            Country
+                            <input name="country" type="text" placeholder="South Korea" required>
+                        </label>
+                        <div class="form-row">
+                            <label>
+                                Latitude
+                                <input name="latitude" type="number" min="-90" max="90" step="any" placeholder="37.5665" required>
+                            </label>
+                            <label>
+                                Longitude
+                                <input name="longitude" type="number" min="-180" max="180" step="any" placeholder="126.9780" required>
+                            </label>
+                        </div>
+                        <div class="form-row">
+                            <label>
+                                Workers
+                                <input name="workers" type="number" min="10" step="1" value="120" required>
+                            </label>
+                            <label>
+                                Sell price
+                                <input name="sell_price" type="number" min="0" step="any" value="1000" required>
+                            </label>
+                        </div>
+                        <div class="form-row">
+                            <label>
+                                Initial cash
+                                <input name="cash_init" type="number" min="0" step="any" value="1000" required>
+                            </label>
+                            <label>
+                                Initial debt
+                                <input name="debt_init" type="number" min="0" step="any" value="1" required>
+                            </label>
+                        </div>
+                        <div class="form-row">
+                            <label>
+                                Previous demand
+                                <input name="previous_demand" type="number" min="0" step="any" value="500" required>
+                            </label>
+                            <label>
+                                Wage / worker
+                                <input name="workers_wage" type="number" min="0" step="any" value="2500" required>
+                            </label>
+                        </div>
+                        <div class="form-row">
+                            <label>
+                                Production / worker
+                                <input name="production_per_worker" type="number" min="0" step="any" value="10" required>
+                            </label>
+                            <label>
+                                Origin price
+                                <input name="origin_price" type="number" min="0" step="any" value="100" required>
+                            </label>
+                        </div>
+                        <div class="form-row">
+                            <label>
+                                Delta time
+                                <input name="deltatime" type="number" min="0.01" step="any" value="1" required>
+                            </label>
+                            <label>
+                                Simulation turns
+                                <input name="stoptime" type="number" min="1" step="any" value="12" required>
+                            </label>
+                        </div>
+                        <button type="submit">Run Simulation &amp; Add</button>
+                        <p id="company-form-status" role="status"></p>
+                    </form>
+                </section>
+
+                <div id="company-list" class="company-list"></div>
+
+                <p class="panel-note">
+                    Companies are kept in memory and reset when the API server restarts.
+                </p>
+            </aside>
+
+            <section class="map-panel">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">GEOGRAPHIC VIEW</p>
+                        <h2>World Operations</h2>
+                    </div>
+                    <span class="map-badge">LIVE SIMULATION</span>
+                </div>
+                <div id="world-map" aria-label="World map"></div>
+            </section>
         </div>
+
+        <section class="simulation-details" hidden>
+            <h2>Simulation Charts</h2>
+            <canvas id="cash-chart"></canvas>
+            <h2>Workers</h2>
+            <canvas id="workers-chart"></canvas>
+            <h2>Demand</h2>
+            <canvas id="demand-chart"></canvas>
+            <h2>Simulation Data[DEBUG]</h2>
+            <div class="table-wrapper">
+                <table id="simulation-table">
+                    <thead></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
     </main>
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="/geomap/geo_main.js"></script>
     <script src="main.js"></script>
 </body>
 </html>

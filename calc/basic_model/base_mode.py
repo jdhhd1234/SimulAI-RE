@@ -29,10 +29,11 @@ class CompanyModel:
         origin_price,
         sell_price,
         deltatime,
-        stoptime
+        stoptime,
+        debt_init=1.0,
     ):
         self.cash_init = cash_init       # 현금보유 초기 가격
-        self.debt_init = 1.0             # 부채 초기 가격
+        self.debt_init = debt_init       # 부채 초기 가격
 
         self.previous_demand = previous_demand
 
@@ -46,20 +47,25 @@ class CompanyModel:
         self.deltatime = deltatime       # 델타타임
         self.stoptime = stoptime         # 멈추는 타이밍
 
-        
         self.consumption = np.random.randint(1, 1000) # 소비 / 일단 랜덤으로 한다. 나중에는 ABM으로 처리
         
     def _create_cash_section(self, model):
         # 현금관련 메인쪽
         cash = model.stock("cash")
         debt = model.stock("debt")
+        loan = model.flow("loan")
         
         cash.initial_value = self.cash_init
         debt.initial_value = self.debt_init
         
         ## UtilityAI가 "debt" 라는 action을 하면 
-        ## 여기서 현재 채무를 완벽히 상환하는걸로 일단 구현
-        debt.equation = 
+        ## 여기서 일단은 현재 채무를 12000정도 하는걸로 구현
+        loan.equation = sd.If(
+            sd.delay(model, model.converter("utility_action"), float(self.deltatime), 0.0) == 4,
+            12000 / float(self.deltatime),
+            0,
+        )
+        debt.equation = loan
 
         cash_ratio = model.converter("cash_ratio")
         cash_ratio.equation = debt / sd.max(cash, 0.0001)
@@ -103,7 +109,7 @@ class CompanyModel:
         ## 지금 order_shortage랑 debt_pressure이 재대로 작동을 안함
         layoffs.equation = sd.If(
             self.utility_action == 2,
-            (0.5 * order_shortage + 0.5 * debt_pressure),
+            sd.max(0, 0.5 * order_shortage + 0.5 * debt_pressure),
             0,
         )
 
@@ -156,7 +162,10 @@ class CompanyModel:
         self._create_utility_section(model, demand, debt, cash, workers, profit)
         hiring = self._create_workforce_part_hiring(model, demand, self.production_per_worker)
         layoffs, order_shortage, debt_pressure = self._create_workforce_part_layoffs(model, demand, debt)
-        workers.equation = hiring - layoffs
+        workers.equation = sd.max(
+            hiring - layoffs,
+            (10 - workers) / float(self.deltatime),
+        )
 
         # 디버깅으로 order_shortage, debt_pressure 이거 추가
         return workers, hiring, layoffs, order_shortage, debt_pressure
@@ -191,7 +200,6 @@ class CompanyModel:
     def _create_market_section(self, model, factory_production):
         # 판매 수요 관련 / 시장 previous_demand
         inventory = model.stock("inventory") # 재고
-
         demand = model.converter("demand") # 수요
         sales = model.flow("sales")        # 실제 팔린거
 
@@ -202,7 +210,9 @@ class CompanyModel:
         ## 나중에 이건 ABM으로 뺼 예정
         ## 일단 지금은 random쓴다
         # 수요 = 이전 수요의 영향 + 무작위 충격
-        demand.equation = sd.max(sd.round(previous_demand_data + sd.normal(0.0, 5.0), 0), 0)
+        #demand.equation = sd.max(sd.round(previous_demand_data + sd.normal(0.0, 5.0), 0), 0)
+        demand.equation = 10000
+
 
         ## 판매 재고 공식 / 판매는 / 판매 = 수요
         sales.equation = sd.min(demand, inventory)
@@ -234,7 +244,7 @@ class CompanyModel:
         ## 이거는 20% 정도
         wage_cost = model.converter("workers_wage")
         wage_cost.initial_value = self.workers_wage
-        wage_cost.equation = self.workers_wage * self.workers
+        wage_cost.equation = self.workers_wage * workers
 
         # 최종적으로 남은돈
         profit = model.converter("profit")
@@ -275,23 +285,23 @@ class CompanyModel:
         profit = self._create_profit_section(model, sales, workers)
         
         ## 일단은 단순 현금은 profit와 같다로 한다
-        cash.equation = profit
+        cash.equation = profit + model.flow("loan")
         
         return model
         
 
-def mainRun(Pretty: bool, Integer: bool = True):
+def mainRun(Pretty: bool, Integer: bool = True, company=None):
     maindata = []
-    sim_data = CompanyModel(
-        cash_init=1000.0, 
+    sim_data = company or CompanyModel(
+        cash_init=1000.0,
         previous_demand=random.randint(1, 1000),
-        origin_price=250.0,
-        sell_price=500.0,  
+        origin_price=100.0,
+        sell_price=1000.0,
         workers=120.0,
         workers_wage=2500,
         production_per_worker=10,
         deltatime=1.0,
-        stoptime=12.0
+        stoptime=12.0,
     )
     
     economic_model = sim_data.CompanyModel()

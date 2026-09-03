@@ -3,6 +3,8 @@ const chartCanvas = document.querySelector("#cash-chart");
 const workersChartCanvas = document.querySelector("#workers-chart");
 const demandChartCanvas = document.querySelector("#demand-chart");
 const simulationTable = document.querySelector("#simulation-table");
+const simulationDetails = document.querySelector(".simulation-details");
+const debugMode = document.querySelector("#debug-mode");
 
 async function loadData() {
     try {
@@ -95,4 +97,23 @@ async function loadData() {
     }
 }
 
-loadData();
+let debugDataLoaded = false;
+
+function setDebugMode(enabled) {
+    if (!simulationDetails) {
+        return;
+    }
+
+    simulationDetails.hidden = !enabled;
+    if (enabled && !debugDataLoaded) {
+        debugDataLoaded = true;
+        loadData();
+    }
+}
+
+const debugFromUrl = new URLSearchParams(window.location.search).get("debug") === "true";
+if (debugMode) {
+    debugMode.checked = debugFromUrl;
+    debugMode.addEventListener("change", () => setDebugMode(debugMode.checked));
+}
+setDebugMode(debugFromUrl);

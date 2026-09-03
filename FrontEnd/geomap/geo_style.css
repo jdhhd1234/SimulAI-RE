@@ -1,0 +1,368 @@
+.dashboard-header,
+.dashboard-layout,
+.simulation-details {
+    width: 100%;
+}
+
+main {
+    max-width: 1500px;
+}
+
+.dashboard-header {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.dashboard-header h1,
+.panel-heading h2,
+.section-heading h2,
+.simulation-details h2 {
+    margin: 0;
+}
+
+.dashboard-header h1 {
+    font-size: clamp(28px, 4vw, 44px);
+    letter-spacing: -0.04em;
+}
+
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.debug-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #5d7385;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.debug-toggle input {
+    accent-color: #2d9b78;
+}
+
+.eyebrow {
+    margin: 0 0 8px;
+    color: #6685a3;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+}
+
+#status {
+    margin: 0 0 4px;
+    padding: 8px 12px;
+    border: 1px solid #c9d7e4;
+    border-radius: 999px;
+    background: #edf5fb;
+    color: #38617e;
+    font-size: 13px;
+}
+
+.dashboard-layout {
+    position: relative;
+    display: block;
+}
+
+.info-panel,
+.map-panel {
+    border: 1px solid #d5e0e9;
+    border-radius: 18px;
+    background: #ffffff;
+    box-shadow: 0 12px 30px rgb(36 70 98 / 9%);
+}
+
+.info-panel {
+    position: absolute;
+    top: 76px;
+    left: 28px;
+    z-index: 1000;
+    width: 320px;
+    max-height: calc(min(68vh, 720px) - 24px);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    padding: 22px;
+    background: #102335;
+    color: #f4f8fb;
+    box-shadow: 0 18px 38px rgb(11 30 46 / 30%);
+}
+
+.info-panel .eyebrow {
+    color: #84b4d5;
+}
+
+.panel-heading h2,
+.section-heading h2 {
+    font-size: 20px;
+    letter-spacing: -0.02em;
+}
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 24px;
+}
+
+.metric-card {
+    min-width: 0;
+    padding: 13px;
+    border: 1px solid rgb(150 193 220 / 18%);
+    border-radius: 12px;
+    background: rgb(255 255 255 / 7%);
+}
+
+.metric-card span,
+.action-card span {
+    display: block;
+    color: #a8c0d2;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.metric-card strong {
+    display: block;
+    overflow: hidden;
+    margin-top: 8px;
+    color: #ffffff;
+    font-size: 17px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.action-card {
+    margin-top: 14px;
+    padding: 15px;
+    border-left: 3px solid #65c7a3;
+    border-radius: 8px;
+    background: rgb(101 199 163 / 12%);
+}
+
+.action-card strong {
+    display: block;
+    margin-top: 7px;
+    color: #8be0bf;
+    font-size: 20px;
+}
+
+.editor-section {
+    margin-top: 22px;
+    padding-top: 20px;
+    border-top: 1px solid rgb(150 193 220 / 18%);
+}
+
+.editor-section h3 {
+    margin: 0 0 14px;
+    font-size: 17px;
+}
+
+.editor-help {
+    margin: -6px 0 14px;
+    color: #91aabd;
+    font-size: 11px;
+}
+
+#company-form {
+    display: grid;
+    gap: 10px;
+}
+
+#company-form label {
+    display: grid;
+    gap: 5px;
+    color: #a8c0d2;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+#company-form input {
+    width: 100%;
+    min-width: 0;
+    padding: 9px 10px;
+    border: 1px solid #38536a;
+    border-radius: 7px;
+    outline: none;
+    background: #172f43;
+    color: #ffffff;
+    font: inherit;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+#company-form input:focus {
+    border-color: #65c7a3;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+#company-form button {
+    margin-top: 4px;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: 7px;
+    background: #65c7a3;
+    color: #102335;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+#company-form button:hover {
+    background: #8be0bf;
+}
+
+#company-form-status {
+    min-height: 16px;
+    margin: 0;
+    color: #8be0bf;
+    font-size: 11px;
+}
+
+.company-list {
+    display: grid;
+    gap: 7px;
+    margin-top: 16px;
+}
+
+.company-item {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 9px 10px;
+    border-radius: 7px;
+    background: rgb(255 255 255 / 6%);
+    font-size: 12px;
+}
+
+.company-item strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.company-item span {
+    flex: 0 0 auto;
+    color: #91aabd;
+    font-size: 11px;
+}
+
+.panel-note {
+    margin: auto 0 0;
+    padding-top: 24px;
+    color: #91aabd;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.map-panel {
+    min-width: 0;
+    width: 100%;
+    padding: 14px;
+}
+
+.section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 8px 10px 14px;
+}
+
+.map-badge {
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: #e7f5ef;
+    color: #257256;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+}
+
+#world-map {
+    min-height: 560px;
+    height: min(68vh, 720px);
+    overflow: hidden;
+    border-radius: 12px;
+    background: #d9e9f1;
+}
+
+.leaflet-container {
+    font-family: Arial, sans-serif;
+}
+
+.leaflet-popup-content {
+    margin: 14px 16px;
+    line-height: 1.5;
+}
+
+.map-popup h3 {
+    margin: 0 0 4px;
+    color: #17344c;
+    font-size: 15px;
+}
+
+.map-popup p {
+    margin: 0;
+    color: #5b6f7d;
+    font-size: 12px;
+}
+
+.simulation-details {
+    margin-top: 28px;
+}
+
+.simulation-details > h2 {
+    margin-top: 28px;
+}
+
+@media (max-width: 800px) {
+    body {
+        padding: 18px;
+    }
+
+    .dashboard-header {
+        align-items: start;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .header-controls {
+        align-items: start;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .dashboard-layout {
+        display: block;
+    }
+
+    .info-panel {
+        position: relative;
+        top: auto;
+        left: auto;
+        width: 100%;
+        max-height: none;
+        margin-bottom: 16px;
+    }
+
+    #world-map {
+        min-height: 420px;
+        height: 58vh;
+    }
+}
