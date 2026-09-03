@@ -55,8 +55,11 @@ class CompanyModel:
         debt = model.stock("debt")
         
         cash.initial_value = self.cash_init
-        
         debt.initial_value = self.debt_init
+        
+        ## UtilityAI가 "debt" 라는 action을 하면 
+        ## 여기서 현재 채무를 완벽히 상환하는걸로 일단 구현
+        debt.equation = 
 
         cash_ratio = model.converter("cash_ratio")
         cash_ratio.equation = debt / sd.max(cash, 0.0001)
@@ -126,6 +129,7 @@ class CompanyModel:
             sd.max(demand / sd.max(workers * self.production_per_worker, 1), 0),
             1,
         )
+        
         debt_score.equation = (
             sd.min(sd.max(1 - cash / 1000, 0), 1)
             + sd.min(sd.max(-profit / 1000, 0), 1)
@@ -327,8 +331,6 @@ def mainRun(Pretty: bool, Integer: bool = True):
             "previous_demand": float(row["previous_demand"]),
             "hiring": float(row["hiring"]),
             "layoffs": float(row["layoffs"]),
-            "order_shortage": float(row["order_shortage"]),
-            "debt_pressure": float(row["debt_pressure"]),
             "ai_action": ["", "hire", "layoff", "production", "debt"][int(row["utility_action"])],
         })
 

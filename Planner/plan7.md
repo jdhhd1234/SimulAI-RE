@@ -49,3 +49,19 @@ Action들 중에서 특정 범위의 값을 출력하고 가장 높은걸 선택
 ## UtilityAI설계
 
 CompanyCEOAI를 BPTK 방정식 안에서 직접 호출할 수 없다는 점입니다. BPTK의 값은 시뮬레이션 중 계산되는 값이라, UtilityAI에 연결하려면 중간 변환 코드가 필요합니다.
+
+# 2026/09/03
+
+1. 오늘할꺼
+
+- UtilityAI가 생산량과 채무상환, 채무발행 등등 기업이 할수있는 Action을 하는것
+- 그리고 나머지 흐름과 관련한 영역은 System Dynamics로 처리
+
+일단 Action선택이 됐기는 함 이제 반영을 해야할 차례임.
+
+즉 큰명령은 UtilityAI가 결정하고
+작은 명령은 공식이 처리
+
+예
+
+부채발행 UtilityAI -> System Dynamics에서 어느정도 부채를 발행할것인지 계산 -> 실제 값 반영
