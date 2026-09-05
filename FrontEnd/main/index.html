@@ -13,23 +13,23 @@
     <main>
         <header class="dashboard-header">
             <div>
-                <p class="eyebrow">SIMULAI-RE / WORLD ECONOMY</p>
-                <h1>Company Simulation Data</h1>
+                <p class="eyebrow">SIMULAI-RE / STRATEGIC COMMAND</p>
+                <h1>WAR ECONOMY SIMULATION</h1>
             </div>
             <div class="header-controls">
                 <label class="debug-toggle">
                     <input id="debug-mode" type="checkbox">
-                    Debug mode
+                    전투 정보 모드
                 </label>
-                <p id="status">Loading...</p>
+                <p id="status">로딩 중...</p>
             </div>
         </header>
 
         <div class="dashboard-layout">
             <aside class="info-panel">
                 <div class="panel-heading">
-                    <p class="eyebrow">INTERNAL STATUS</p>
-                    <h2>Economic Overview</h2>
+                    <p class="eyebrow">전투 정보</p>
+                    <h2>전략 상황실</h2>
                 </div>
 
                 <div class="metric-grid">
@@ -60,84 +60,84 @@
                 </div>
 
                 <div class="action-card">
-                    <span>Current AI Action</span>
+                    <span>AI 전략 명령</span>
                     <strong id="metric-action">--</strong>
                 </div>
 
                 <section class="editor-section">
-                    <p class="eyebrow">COMPANY EDITOR</p>
-                    <h3>Add Company</h3>
-                    <p class="editor-help">Click the map to select coordinates.</p>
+                    <p class="eyebrow">자산 배치</p>
+                    <h3>자산 등록</h3>
+                    <p class="editor-help">지도를 클릭하여 좌표를 선택하세요.</p>
                     <form id="company-form">
                         <label>
-                            Company name
+                            자산명
                             <input name="name" type="text" placeholder="Example Corp" required>
                         </label>
                         <label>
-                            Country
+                            국가
                             <input name="country" type="text" placeholder="South Korea" required>
                         </label>
                         <div class="form-row">
                             <label>
-                                Latitude
+                                위도
                                 <input name="latitude" type="number" min="-90" max="90" step="any" placeholder="37.5665" required>
                             </label>
                             <label>
-                                Longitude
+                                경도
                                 <input name="longitude" type="number" min="-180" max="180" step="any" placeholder="126.9780" required>
                             </label>
                         </div>
                         <div class="form-row">
                             <label>
-                                Workers
+                                병력
                                 <input name="workers" type="number" min="10" step="1" value="120" required>
                             </label>
                             <label>
-                                Sell price
+                                판매 가격
                                 <input name="sell_price" type="number" min="0" step="any" value="1000" required>
                             </label>
                         </div>
                         <div class="form-row">
                             <label>
-                                Initial cash
+                                초기 자금
                                 <input name="cash_init" type="number" min="0" step="any" value="1000" required>
                             </label>
                             <label>
-                                Initial debt
+                                초기 부채
                                 <input name="debt_init" type="number" min="0" step="any" value="1" required>
                             </label>
                         </div>
                         <div class="form-row">
                             <label>
-                                Previous demand
+                                이전 수요
                                 <input name="previous_demand" type="number" min="0" step="any" value="500" required>
                             </label>
                             <label>
-                                Wage / worker
+                                병력 급여
                                 <input name="workers_wage" type="number" min="0" step="any" value="2500" required>
                             </label>
                         </div>
                         <div class="form-row">
                             <label>
-                                Production / worker
+                                병력 생산량
                                 <input name="production_per_worker" type="number" min="0" step="any" value="10" required>
                             </label>
                             <label>
-                                Origin price
+                                원가
                                 <input name="origin_price" type="number" min="0" step="any" value="100" required>
                             </label>
                         </div>
                         <div class="form-row">
                             <label>
-                                Delta time
+                                시간 간격
                                 <input name="deltatime" type="number" min="0.01" step="any" value="1" required>
                             </label>
                             <label>
-                                Simulation turns
+                                시뮬레이션 턴
                                 <input name="stoptime" type="number" min="1" step="any" value="12" required>
                             </label>
                         </div>
-                        <button type="submit">Run Simulation &amp; Add</button>
+                        <button type="submit">시뮬레이션 실행</button>
                         <p id="company-form-status" role="status"></p>
                     </form>
                 </section>
@@ -145,30 +145,41 @@
                 <div id="company-list" class="company-list"></div>
 
                 <p class="panel-note">
-                    Companies are kept in memory and reset when the API server restarts.
+                    자산은 메모리에 저장되며 API 서버 재시작 시 초기화됩니다.
                 </p>
             </aside>
 
             <section class="map-panel">
                 <div class="section-heading">
                     <div>
-                        <p class="eyebrow">GEOGRAPHIC VIEW</p>
-                        <h2>World Operations</h2>
+                        <p class="eyebrow">지리적 전장</p>
+                        <h2>전 세계 작전</h2>
                     </div>
-                    <span class="map-badge">LIVE SIMULATION</span>
+                    <span class="map-badge">실시간 시뮬레이션</span>
                 </div>
                 <div id="world-map" aria-label="World map"></div>
             </section>
         </div>
 
+        <section id="turn-results" class="turn-results" hidden>
+            <div class="turn-results-heading">
+                <div>
+                    <p class="eyebrow">전투 결과</p>
+                    <h2>턴별 전투 보고</h2>
+                </div>
+                <button id="close-turn-results" type="button">닫기</button>
+            </div>
+            <div id="turn-results-list" class="turn-results-list"></div>
+        </section>
+
         <section class="simulation-details" hidden>
-            <h2>Simulation Charts</h2>
+            <h2>전략 차트</h2>
             <canvas id="cash-chart"></canvas>
-            <h2>Workers</h2>
+            <h2>병력</h2>
             <canvas id="workers-chart"></canvas>
-            <h2>Demand</h2>
+            <h2>수요</h2>
             <canvas id="demand-chart"></canvas>
-            <h2>Simulation Data[DEBUG]</h2>
+            <h2>시뮬레이션 데이터 [디버그]</h2>
             <div class="table-wrapper">
                 <table id="simulation-table">
                     <thead></thead>

@@ -284,8 +284,15 @@ class CompanyModel:
         sales, demand = self._create_market_section(model, factory_production)
         profit = self._create_profit_section(model, sales, workers)
         
-        ## 일단은 단순 현금은 profit와 같다로 한다
-        cash.equation = profit + model.flow("loan")
+        ## 현금흐름: 매출유입 + 차입금 - 생산원가 - 연구비 - 마케팅비 - 임금
+        cash.equation = (
+            model.converter("revenue")
+            + model.flow("loan")
+            - model.flow("factory_production") * self.origin_price
+            - model.converter("research_cost")
+            - model.converter("marketing_cost")
+            - model.converter("workers_wage")
+        )
         
         return model
         

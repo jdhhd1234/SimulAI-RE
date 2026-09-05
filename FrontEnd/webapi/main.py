@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -66,6 +66,14 @@ def get_data():
 @app.get("/companies")
 def get_companies():
     return [company_summary(company) for company in companies]
+
+
+@app.get("/companies/{company_id}")
+def get_company(company_id: str):
+    company = next((item for item in companies if item["id"] == company_id), None)
+    if company is None:
+        raise HTTPException(status_code=404, detail="Company not found")
+    return company
 
 
 @app.post("/companies")
