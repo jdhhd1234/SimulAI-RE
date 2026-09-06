@@ -121,6 +121,10 @@ function renderCompanies(companies) {
             fillColor: "#666666",
             fillOpacity: 0.9,
         })
+            .bindTooltip(createPopup(company), {
+                direction: "top",
+                className: "company-tooltip",
+            })
             .bindPopup(createPopup(company))
             .on("click", () => loadCompanies(company.id, true))
             .addTo(markerLayer);

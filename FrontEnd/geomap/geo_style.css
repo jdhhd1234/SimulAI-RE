@@ -434,6 +434,19 @@ main {
     font-size: 12px;
 }
 
+.company-tooltip {
+    padding: 0;
+    border: 1px solid #333333;
+    border-radius: 2px;
+    background: #0a0a0a;
+    color: #cccccc;
+    box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
+}
+
+.company-tooltip::before {
+    border-top-color: #333333;
+}
+
 body.results-open {
     overflow: auto;
 }
