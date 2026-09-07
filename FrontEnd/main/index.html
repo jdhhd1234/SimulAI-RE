@@ -32,32 +32,7 @@
                     <h2>전략 상황실</h2>
                 </div>
 
-                <div class="metric-grid">
-                    <article class="metric-card">
-                        <span>Cash</span>
-                        <strong id="metric-cash">--</strong>
-                    </article>
-                    <article class="metric-card">
-                        <span>Profit</span>
-                        <strong id="metric-profit">--</strong>
-                    </article>
-                    <article class="metric-card">
-                        <span>Debt</span>
-                        <strong id="metric-debt">--</strong>
-                    </article>
-                    <article class="metric-card">
-                        <span>Workers</span>
-                        <strong id="metric-workers">--</strong>
-                    </article>
-                    <article class="metric-card">
-                        <span>Revenue</span>
-                        <strong id="metric-revenue">--</strong>
-                    </article>
-                    <article class="metric-card">
-                        <span>Demand</span>
-                        <strong id="metric-demand">--</strong>
-                    </article>
-                </div>
+                <div class="metric-grid"></div>
 
                 <div class="action-card">
                     <span>AI 전략 명령</span>
@@ -89,52 +64,22 @@
                         </div>
                         <div class="form-row">
                             <label>
-                                병력
-                                <input name="workers" type="number" min="10" step="1" value="120" required>
+                                GDP
+                                <input name="gdp" type="number" min="0" step="any" value="100000" required>
                             </label>
                             <label>
-                                판매 가격
-                                <input name="sell_price" type="number" min="0" step="any" value="1000" required>
-                            </label>
-                        </div>
-                        <div class="form-row">
-                            <label>
-                                초기 자금
-                                <input name="cash_init" type="number" min="0" step="any" value="1000" required>
-                            </label>
-                            <label>
-                                초기 부채
-                                <input name="debt_init" type="number" min="0" step="any" value="1" required>
+                                인구
+                                <input name="population" type="number" min="1" step="any" value="1200000" required>
                             </label>
                         </div>
                         <div class="form-row">
                             <label>
-                                이전 수요
-                                <input name="previous_demand" type="number" min="0" step="any" value="500" required>
+                                세율
+                                <input name="tax_rate" type="number" min="0" step="any" value="12" required>
                             </label>
                             <label>
-                                병력 급여
-                                <input name="workers_wage" type="number" min="0" step="any" value="2500" required>
-                            </label>
-                        </div>
-                        <div class="form-row">
-                            <label>
-                                병력 생산량
-                                <input name="production_per_worker" type="number" min="0" step="any" value="10" required>
-                            </label>
-                            <label>
-                                원가
-                                <input name="origin_price" type="number" min="0" step="any" value="100" required>
-                            </label>
-                        </div>
-                        <div class="form-row">
-                            <label>
-                                시간 간격
-                                <input name="deltatime" type="number" min="0.01" step="any" value="1" required>
-                            </label>
-                            <label>
-                                시뮬레이션 턴
-                                <input name="stoptime" type="number" min="1" step="any" value="12" required>
+                                자원력
+                                <input name="resource_power" type="number" min="0" step="any" value="7" required>
                             </label>
                         </div>
                         <button type="submit">시뮬레이션 실행</button>
@@ -158,6 +103,10 @@
                     <span class="map-badge">실시간 시뮬레이션</span>
                 </div>
                 <div id="world-map" aria-label="World map"></div>
+                <div class="map-charts">
+                    <h2>전략 차트</h2>
+                    <canvas id="map-chart"></canvas>
+                </div>
             </section>
         </div>
 
@@ -175,10 +124,6 @@
         <section class="simulation-details" hidden>
             <h2>전략 차트</h2>
             <canvas id="cash-chart"></canvas>
-            <h2>병력</h2>
-            <canvas id="workers-chart"></canvas>
-            <h2>수요</h2>
-            <canvas id="demand-chart"></canvas>
             <h2>시뮬레이션 데이터 [디버그]</h2>
             <div class="table-wrapper">
                 <table id="simulation-table">

@@ -17,27 +17,15 @@ class CountryEconomic:
         tax_rate,
         resource_power
     ) -> None:
-
         self.gdp = gdp
         self.population = population
         self.tax_rate = tax_rate
         self.resource_power = resource_power
 
-    def population_func(self, model: Model):
-        population = model.stock("population")
-        population.initial_value = self.population
-
-        return population
-
-    def tax_rate_func(self, model: Model):
-        tax_rate = model.converter("tax_rate")
-        tax_rate.equation = self.tax_rate
-
-        return tax_rate
-
-    def gdp_func(self, model: Model):
+    def gdp_func(self, model: Model, sell):
+        """GDP는 국내총생산이라서 여기에 뭐 국내생산에 다 들어감"""
         gdp = model.converter("gdp")
-        gdp.equation = self.gdp
+        gdp.equation = sell * self.tax_rate
 
         return gdp
 
@@ -46,6 +34,35 @@ class CountryEconomic:
         tax_revenue.equation = gdp * tax_rate
 
         return tax_revenue
+    
+    def hire_func(self, model: Model, population):
+        # 일단 지금은 복잡하게 말고 random으로 처리(# 2026/09/07)
+        hire = model.flow("hire")
+        hire.equation = np.random.randint(1, population)
+        
+        return hire
+    
+    def labor_func(self, model: Model, hire):
+        
+        labor = model.stock("labor")
+        labor.equation = hire
+        
+        return labor
+    
+    def production_func(self, model: Model, labor_count):
+        
+        # 노동자 한명당 일단 5개씩 생산
+        production = model.stock("production")
+        production.equation = labor_count * 5
+        
+        return production
+    
+    def sell_func(self, model: Model, sell_price, production):
+        
+        sell = model.converter("sell")
+        sell.equation = production * sell_price
+        
+        return sell
 
     def countryModel(self):
 
@@ -55,15 +72,19 @@ class CountryEconomic:
             dt=0.1,
             name="CountryModel"
         )
-
-        population = self.population_func(model)
-        gdp = self.gdp_func(model)
-        tax_rate = self.tax_rate_func(model)
+        
+        
+        hire = self.hire_func(model, self.population)
+        labor = self.labor_func(model, hire)
+        production = self.production_func(model, labor)
+        sell = self.sell_func(model, 1000, production)
+        
+        gdp = self.gdp_func(model, sell)
 
         tax_revenue = self.tax_revenue_func(
             model,
             gdp,
-            tax_rate
+            self.tax_rate
         )
 
         return model
@@ -81,10 +102,12 @@ def mainRun(Pretty: bool, Integer: bool = True, company=None):
     
     print("[CLI] 시뮬레이션 엔진 가동 및 결과 연산...")
     df = economic_model.simulate(equations=[
-        "population",
-        "tax_rate",
         "gdp",
-        "tax_revenue"
+        "tax_revenue",
+        "hire",
+        "labor",
+        "production",
+        "sell"
     ])
 
     if Integer is True:
@@ -97,10 +120,12 @@ def mainRun(Pretty: bool, Integer: bool = True, company=None):
         maindata.append({
             # Time Error은 무시해도 괜찮음.
             "time": float(time),
-            "population": float(row["population"]),
-            "tax_rate": float(row["tax_rate"]),
             "gdp": float(row["gdp"]),
             "tax_revenue": float(row["tax_revenue"]),
+            "hire": float(row["hire"]),
+            "labor": float(row["labor"]),
+            "production": float(row["production"]),
+            "sell": float(row["sell"]),
         })
 
     if Integer is True:

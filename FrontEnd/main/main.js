@@ -1,17 +1,15 @@
-const status = document.querySelector("#status");
+const statusEl = document.querySelector("#status");
 const chartCanvas = document.querySelector("#cash-chart");
-const workersChartCanvas = document.querySelector("#workers-chart");
-const demandChartCanvas = document.querySelector("#demand-chart");
 const simulationTable = document.querySelector("#simulation-table");
 const simulationDetails = document.querySelector(".simulation-details");
+const mapChartCanvas = document.querySelector("#map-chart");
 const debugMode = document.querySelector("#debug-mode");
 const turnResults = document.querySelector("#turn-results");
 const turnResultsList = document.querySelector("#turn-results-list");
 const closeTurnResults = document.querySelector("#close-turn-results");
 
 let cashChart;
-let workersChart;
-let demandChart;
+let mapChart;
 let latestSimulationData = [];
 let debugDataLoaded = false;
 
@@ -34,17 +32,13 @@ function renderTurnResults(data) {
     data.forEach((point) => {
         const item = document.createElement("article");
         item.className = "turn-result-card";
+        const keys = Object.keys(point).filter((key) => key !== "time" && key !== "ai_action");
         item.innerHTML = `
             <div class="turn-result-title">턴 ${point.time}</div>
             <div class="turn-result-values">
-                <span>자금 <strong>${point.cash.toLocaleString("ko-KR")}</strong></span>
-                <span>수익 <strong>${point.profit.toLocaleString("ko-KR")}</strong></span>
-                <span>부채 <strong>${point.debt.toLocaleString("ko-KR")}</strong></span>
-                <span>병력 <strong>${point.workers.toLocaleString("ko-KR")}</strong></span>
-                <span>매출 <strong>${point.revenue.toLocaleString("ko-KR")}</strong></span>
-                <span>수요 <strong>${point.demand.toLocaleString("ko-KR")}</strong></span>
+                ${keys.map((key) => `<span>${key} <strong>${typeof point[key] === "number" ? point[key].toLocaleString("ko-KR") : point[key]}</strong></span>`).join("")}
             </div>
-            <div class="turn-result-action">AI 전략: <strong>${point.ai_action || "--"}</strong></div>
+            ${point.ai_action ? `<div class="turn-result-action">AI 전략: <strong>${point.ai_action}</strong></div>` : ""}
         `;
         turnResultsList.appendChild(item);
     });
@@ -90,20 +84,50 @@ function renderSimulation(data) {
     latestSimulationData = data;
     renderTurnResults(data);
     cashChart?.destroy();
-    workersChart?.destroy();
-    demandChart?.destroy();
+    mapChart?.destroy();
 
-    const chartColors = ["#ffffff", "#aaaaaa", "#666666", "#444444"];
+    const chartColors = ["#ffffff", "#4fc3f7", "#ffb74d", "#81c784", "#e57373", "#ba68c8", "#fff176", "#4db6ac"];
     const gridColor = "#333333";
     const tickColor = "#888888";
+
+    const numericKeys = Object.keys(data[0]).filter((key) => key !== "time" && key !== "ai_action" && typeof data[0][key] === "number");
+
+    if (mapChartCanvas) {
+        mapChart = new Chart(mapChartCanvas, {
+            type: "line",
+            data: {
+                labels: data.map((point) => point.time),
+                datasets: numericKeys.map((key, i) => ({
+                    label: key,
+                    data: data.map((point) => point[key]),
+                    tension: 0.1,
+                    borderColor: chartColors[i % chartColors.length],
+                    backgroundColor: "transparent",
+                })),
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: tickColor, maxTicksLimit: 5, font: { size: 10 } },
+                    },
+                    y: {
+                        grid: { color: "#222222" },
+                        ticks: { color: tickColor, maxTicksLimit: 4, font: { size: 10 } },
+                    },
+                },
+                plugins: { legend: { labels: { color: tickColor, boxWidth: 8, font: { size: 10 } } } },
+            },
+        });
+    }
 
     cashChart = new Chart(chartCanvas, {
         type: "line",
         data: {
             labels: data.map((point) => point.time),
-            datasets: Object.keys(data[0])
-                .filter((key) => !["time", "workers", "demand", "previous_demand", "ai_action"].includes(key))
-                .map((key, i) => ({
+            datasets: numericKeys.map((key, i) => ({
                     label: key,
                     data: data.map((point) => point[key]),
                     tension: 0.1,
@@ -112,54 +136,8 @@ function renderSimulation(data) {
                 })),
         },
         options: {
-            scales: {
-                x: { grid: { color: gridColor }, ticks: { color: tickColor } },
-                y: { grid: { color: gridColor }, ticks: { color: tickColor } },
-            },
-            plugins: { legend: { labels: { color: tickColor } } },
-        },
-    });
-
-    workersChart = new Chart(workersChartCanvas, {
-        type: "line",
-        data: {
-            labels: data.map((point) => point.time),
-            datasets: [
-                {
-                    label: "workers",
-                    data: data.map((point) => point.workers),
-                    tension: 0.1,
-                    borderColor: "#ffffff",
-                    backgroundColor: "transparent",
-                },
-            ],
-        },
-        options: {
-            scales: {
-                x: { grid: { color: gridColor }, ticks: { color: tickColor } },
-                y: {
-                    title: { display: true, text: "Workers", color: tickColor },
-                    grid: { color: gridColor },
-                    ticks: { color: tickColor },
-                },
-            },
-            plugins: { legend: { labels: { color: tickColor } } },
-        },
-    });
-
-    demandChart = new Chart(demandChartCanvas, {
-        type: "line",
-        data: {
-            labels: data.map((point) => point.time),
-            datasets: ["demand", "previous_demand"].map((key, i) => ({
-                label: key,
-                data: data.map((point) => point[key]),
-                tension: 0.1,
-                borderColor: i === 0 ? "#ffffff" : "#666666",
-                backgroundColor: "transparent",
-            })),
-        },
-        options: {
+            responsive: true,
+            maintainAspectRatio: false,
             scales: {
                 x: { grid: { color: gridColor }, ticks: { color: tickColor } },
                 y: { grid: { color: gridColor }, ticks: { color: tickColor } },
@@ -186,14 +164,12 @@ document.addEventListener("company-data", (event) => {
     }
 
     renderSimulation(data);
-    if (event.detail.showResults || debugMode?.checked) {
-        setResultsOpen(true);
-        if (turnResults) {
-            turnResults.hidden = false;
-        }
-        if (status) {
-            status.textContent = "연결됨";
-        }
+    setResultsOpen(true);
+    if (turnResults) {
+        turnResults.hidden = false;
+    }
+    if (statusEl) {
+        statusEl.textContent = "연결됨";
     }
 });
 

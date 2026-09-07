@@ -26,21 +26,17 @@ function formatValue(value) {
 }
 
 function updateOverview(point) {
-    const values = {
-        "metric-cash": point.cash,
-        "metric-profit": point.profit,
-        "metric-debt": point.debt,
-        "metric-workers": point.workers,
-        "metric-revenue": point.revenue,
-        "metric-demand": point.demand,
-    };
-
-    Object.entries(values).forEach(([id, value]) => {
-        const element = document.querySelector(`#${id}`);
-        if (element) {
-            element.textContent = formatValue(value);
-        }
-    });
+    const metricGrid = document.querySelector(".metric-grid");
+    if (metricGrid) {
+        metricGrid.innerHTML = Object.entries(point)
+            .filter(([key, value]) => key !== "time" && typeof value === "number")
+            .map(([key, value]) => `
+                <article class="metric-card">
+                    <span>${escapeHtml(key)}</span>
+                    <strong>${formatValue(value)}</strong>
+                </article>
+            `).join("");
+    }
 
     const action = document.querySelector("#metric-action");
     if (action) {
@@ -55,9 +51,11 @@ function createPopup(company) {
         <div class="map-popup">
             <h3>${escapeHtml(company.name)}</h3>
             <p>${escapeHtml(company.country)}</p>
-            <p>전략: ${escapeHtml(point.ai_action || "--")}</p>
-            <p>수익: ${formatValue(point.profit)}</p>
-            <p>병력: ${formatValue(point.workers)}</p>
+            ${Object.entries(point)
+                .filter(([key, value]) => key !== "time" && typeof value === "number")
+                .slice(0, 3)
+                .map(([key, value]) => `<p>${escapeHtml(key)}: ${formatValue(value)}</p>`)
+                .join("")}
         </div>
     `;
 }
@@ -203,16 +201,10 @@ async function addCompany(event) {
     };
 
     [
-        "cash_init",
-        "debt_init",
-        "previous_demand",
-        "workers",
-        "workers_wage",
-        "production_per_worker",
-        "origin_price",
-        "sell_price",
-        "deltatime",
-        "stoptime",
+        "gdp",
+        "population",
+        "tax_rate",
+        "resource_power",
     ].forEach((field) => {
         company[field] = Number(formData.get(field));
     });
