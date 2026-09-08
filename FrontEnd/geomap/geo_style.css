@@ -408,9 +408,18 @@ main {
     color: #666666;
 }
 
-.map-charts canvas {
+.map-charts .chart-box {
+    position: relative;
+    flex: 0 0 auto;
     width: 100%;
     height: 120px;
+}
+
+.map-charts .chart-box canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
 }
 
 .section-heading {
@@ -469,10 +478,9 @@ main {
     flex: 0 0 auto;
 }
 
-.map-panel.chart-view .map-charts canvas {
-    width: 100%;
-    height: 120px;
+.map-panel.chart-view .map-charts .chart-box {
     flex: 1 1 0%;
+    height: auto;
     min-height: 0;
 }
 

@@ -106,6 +106,7 @@ function renderSimulation(data) {
     const numericKeys = Object.keys(data[0]).filter((key) => key !== "time" && key !== "ai_action" && typeof data[0][key] === "number");
     const allNumbers = data.flatMap((point) => numericKeys.map((key) => point[key]).filter(Number.isFinite));
     const maxAbs = allNumbers.length ? Math.max(...allNumbers.map((value) => Math.abs(value))) : 0;
+    const useLogScale = maxAbs > 10000;
 
     if (mapChartCanvas) {
         mapChart = new Chart(mapChartCanvas, {
@@ -121,7 +122,7 @@ function renderSimulation(data) {
                 })),
             },
             options: {
-                responsive: false,
+                responsive: true,
                 maintainAspectRatio: false,
                 scales: {
                     x: {
@@ -152,7 +153,7 @@ function renderSimulation(data) {
                 })),
         },
         options: {
-            responsive: false,
+            responsive: true,
             maintainAspectRatio: false,
             scales: {
                 x: { grid: { color: gridColor }, ticks: { color: tickColor } },

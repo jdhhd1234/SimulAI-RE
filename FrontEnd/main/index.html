@@ -109,8 +109,9 @@
                 <div id="world-map" aria-label="World map"></div>
                 <div class="map-charts">
                     <h2>전략 차트</h2>
-                    <canvas id="map-chart"></canvas> 
-                    <!-- 이거 size가 계속 커지는중 -->
+                    <div class="chart-box">
+                        <canvas id="map-chart"></canvas>
+                    </div>
                 </div>
             </section>
         </div>
@@ -128,8 +129,9 @@
 
         <section class="simulation-details" hidden>
             <h2>전략 차트</h2>
-            <canvas id="cash-chart" width="1000" height="350"></canvas>
-            <!-- 이거 size가 계속 커지는중 -->
+            <div class="chart-box">
+                <canvas id="cash-chart"></canvas>
+            </div>
             <h2>시뮬레이션 데이터 [디버그]</h2>
             <div class="table-wrapper">
                 <table id="simulation-table">
