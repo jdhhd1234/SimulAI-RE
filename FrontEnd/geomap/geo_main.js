@@ -7,6 +7,7 @@ const status = document.querySelector("#status");
 let map;
 let markerLayer;
 let coordinateMarker;
+let knownCompanyIds = new Set();
 
 function escapeHtml(value) {
     return String(value ?? "")
@@ -169,6 +170,7 @@ async function loadCompanies(selectedId, showResults = false) {
         }
 
         const companies = await response.json();
+        knownCompanyIds = new Set(companies.map((company) => company.id));
         const selectedCompany = companies.find((company) => company.id === selectedId) || companies[0];
         updateOverview(selectedCompany?.latest || {});
         renderCompanyList(companies, selectedCompany?.id);
@@ -251,4 +253,45 @@ document.addEventListener("map-view-change", (event) => {
     requestAnimationFrame(() => map.invalidateSize());
 });
 
-loadCompanies();
+const AUTO_REFRESH_MS = 3000;
+let autoSyncRunning = false;
+
+async function syncCompanies() {
+    if (autoSyncRunning) {
+        return;
+    }
+    autoSyncRunning = true;
+
+    try {
+        const response = await fetch("/companies");
+        if (!response.ok) {
+            return;
+        }
+
+        const companies = await response.json();
+        const currentIds = new Set(companies.map((company) => company.id));
+        const added = companies.filter((company) => !knownCompanyIds.has(company.id));
+        knownCompanyIds = currentIds;
+
+        if (!added.length) {
+            return;
+        }
+
+        const newest = companies[companies.length - 1];
+        updateOverview(newest.latest || {});
+        renderCompanyList(companies, newest.id);
+        renderCompanies(companies);
+        await loadCompanyData(newest.id, false);
+        if (status) {
+            status.textContent = `새 자산 자동 등록: ${newest.name}`;
+        }
+    } catch {
+        knownCompanyIds = new Set();
+    } finally {
+        autoSyncRunning = false;
+    }
+}
+
+loadCompanies(undefined, true).then(() => {
+    setInterval(syncCompanies, AUTO_REFRESH_MS);
+});

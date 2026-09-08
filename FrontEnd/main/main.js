@@ -180,14 +180,17 @@ function setDebugMode(enabled) {
 
 document.addEventListener("company-data", (event) => {
     const data = event.detail?.data;
+    const showResults = event.detail?.showResults === true;
     if (!data?.length) {
         return;
     }
 
     renderSimulation(data);
-    setResultsOpen(true);
-    if (turnResults) {
-        turnResults.hidden = false;
+    if (showResults) {
+        setResultsOpen(true);
+        if (turnResults) {
+            turnResults.hidden = false;
+        }
     }
     if (statusEl) {
         statusEl.textContent = "연결됨";
