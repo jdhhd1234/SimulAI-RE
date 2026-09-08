@@ -69,7 +69,7 @@ class CountryEconomic:
         model = Model(
             starttime=0.0,
             stoptime=5.0,
-            dt=0.1,
+            dt=1.0,
             name="CountryModel"
         )
         
@@ -92,9 +92,9 @@ class CountryEconomic:
 def mainRun(Pretty: bool, Integer: bool = True, company=None):
     maindata = []
     sim_data = company or CountryEconomic(
-        gdp=100000.0,
-        population=1200000.0,
-        tax_rate=12.0,
+        gdp=1000.0,
+        population=1200.0,
+        tax_rate=0.12,
         resource_power=7.0
     )
     

@@ -410,11 +410,70 @@ main {
 
 .map-charts canvas {
     width: 100%;
-    height: 140px;
+    height: 120px;
 }
 
 .section-heading {
     display: none;
+}
+
+.map-view-toggle {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 0;
+    padding: 10px 14px 0;
+}
+
+.map-view-toggle button {
+    padding: 6px 14px;
+    border: 1px solid #333333;
+    background: #161616;
+    color: #888888;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+}
+
+.map-view-toggle button:first-child {
+    border-radius: 2px 0 0 2px;
+}
+
+.map-view-toggle button:last-child {
+    margin-left: -1px;
+    border-radius: 0 2px 2px 0;
+}
+
+.map-view-toggle button:hover {
+    color: #cccccc;
+}
+
+.map-view-toggle button.active {
+    border-color: #ffffff;
+    background: #ffffff;
+    color: #000000;
+    font-weight: 700;
+}
+
+.map-panel.chart-view #world-map {
+    display: none;
+}
+
+.map-panel.chart-view .map-charts {
+    display: flex;
+    flex: 1 1 0%;
+    min-height: 0;
+    flex-direction: column;
+}
+
+.map-panel.chart-view .map-charts h2 {
+    flex: 0 0 auto;
+}
+
+.map-panel.chart-view .map-charts canvas {
+    width: 100%;
+    height: 120px;
+    flex: 1 1 0%;
+    min-height: 0;
 }
 
 .map-badge {

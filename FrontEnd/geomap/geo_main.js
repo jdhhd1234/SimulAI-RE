@@ -243,4 +243,12 @@ if (infoPanel) {
     });
 }
 
+document.addEventListener("map-view-change", (event) => {
+    if (event.detail?.view !== "map" || !map) {
+        return;
+    }
+
+    requestAnimationFrame(() => map.invalidateSize());
+});
+
 loadCompanies();

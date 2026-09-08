@@ -95,6 +95,10 @@
             </aside>
 
             <section class="map-panel">
+                <div class="map-view-toggle" role="group" aria-label="화면 전환">
+                    <button type="button" class="active" data-view="map" aria-pressed="true">지도 뷰어</button>
+                    <button type="button" data-view="chart" aria-pressed="false">그래프</button>
+                </div>
                 <div class="section-heading">
                     <div>
                         <p class="eyebrow">지리적 전장</p>
@@ -105,7 +109,8 @@
                 <div id="world-map" aria-label="World map"></div>
                 <div class="map-charts">
                     <h2>전략 차트</h2>
-                    <canvas id="map-chart"></canvas>
+                    <canvas id="map-chart"></canvas> 
+                    <!-- 이거 size가 계속 커지는중 -->
                 </div>
             </section>
         </div>
@@ -123,7 +128,8 @@
 
         <section class="simulation-details" hidden>
             <h2>전략 차트</h2>
-            <canvas id="cash-chart"></canvas>
+            <canvas id="cash-chart" width="1000" height="350"></canvas>
+            <!-- 이거 size가 계속 커지는중 -->
             <h2>시뮬레이션 데이터 [디버그]</h2>
             <div class="table-wrapper">
                 <table id="simulation-table">

@@ -4,6 +4,7 @@ const simulationTable = document.querySelector("#simulation-table");
 const simulationDetails = document.querySelector(".simulation-details");
 const mapChartCanvas = document.querySelector("#map-chart");
 const debugMode = document.querySelector("#debug-mode");
+const mapViewToggle = document.querySelector(".map-view-toggle");
 const turnResults = document.querySelector("#turn-results");
 const turnResultsList = document.querySelector("#turn-results-list");
 const closeTurnResults = document.querySelector("#close-turn-results");
@@ -76,6 +77,18 @@ function renderTable(data) {
     });
 }
 
+function scaleValue(value) {
+    if (!Number.isFinite(value)) {
+        return null;
+    }
+
+    return Math.sign(value) * Math.log10(1 + Math.abs(value));
+}
+
+function scaleSeries(series) {
+    return series.map(scaleValue);
+}
+
 function renderSimulation(data) {
     if (!data?.length || !chartCanvas) {
         return;
@@ -91,6 +104,8 @@ function renderSimulation(data) {
     const tickColor = "#888888";
 
     const numericKeys = Object.keys(data[0]).filter((key) => key !== "time" && key !== "ai_action" && typeof data[0][key] === "number");
+    const allNumbers = data.flatMap((point) => numericKeys.map((key) => point[key]).filter(Number.isFinite));
+    const maxAbs = allNumbers.length ? Math.max(...allNumbers.map((value) => Math.abs(value))) : 0;
 
     if (mapChartCanvas) {
         mapChart = new Chart(mapChartCanvas, {
@@ -99,23 +114,24 @@ function renderSimulation(data) {
                 labels: data.map((point) => point.time),
                 datasets: numericKeys.map((key, i) => ({
                     label: key,
-                    data: data.map((point) => point[key]),
+                    data: useLogScale ? scaleSeries(data.map((point) => point[key])) : data.map((point) => point[key]),
                     tension: 0.1,
                     borderColor: chartColors[i % chartColors.length],
                     backgroundColor: "transparent",
                 })),
             },
             options: {
-                responsive: true,
+                responsive: false,
                 maintainAspectRatio: false,
                 scales: {
                     x: {
                         grid: { display: false },
-                        ticks: { color: tickColor, maxTicksLimit: 5, font: { size: 10 } },
+                        ticks: { color: tickColor, maxTicksLimit: 2, font: { size: 10 } },
                     },
                     y: {
                         grid: { color: "#222222" },
-                        ticks: { color: tickColor, maxTicksLimit: 4, font: { size: 10 } },
+                        ticks: { color: tickColor, maxTicksLimit: 2, font: { size: 10 } },
+                        title: useLogScale ? { display: false, text: "log10(1+|x|)", color: tickColor, font: { size: 5 } } : undefined,
                     },
                 },
                 plugins: { legend: { labels: { color: tickColor, boxWidth: 8, font: { size: 10 } } } },
@@ -129,18 +145,22 @@ function renderSimulation(data) {
             labels: data.map((point) => point.time),
             datasets: numericKeys.map((key, i) => ({
                     label: key,
-                    data: data.map((point) => point[key]),
+                    data: useLogScale ? scaleSeries(data.map((point) => point[key])) : data.map((point) => point[key]),
                     tension: 0.1,
                     borderColor: chartColors[i % chartColors.length],
                     backgroundColor: "transparent",
                 })),
         },
         options: {
-            responsive: true,
+            responsive: false,
             maintainAspectRatio: false,
             scales: {
                 x: { grid: { color: gridColor }, ticks: { color: tickColor } },
-                y: { grid: { color: gridColor }, ticks: { color: tickColor } },
+                y: {
+                    grid: { color: gridColor },
+                    ticks: { color: tickColor },
+                    title: useLogScale ? { display: false, text: "log10(1+|x|)", color: tickColor, font: { size: 10 } } : undefined,
+                },
             },
             plugins: { legend: { labels: { color: tickColor } } },
         },
@@ -178,6 +198,38 @@ if (closeTurnResults) {
         if (turnResults) {
             turnResults.hidden = true;
         }
+    });
+}
+
+function setMapView(view) {
+    const mapPanel = document.querySelector(".map-panel");
+    if (!mapPanel) {
+        return;
+    }
+
+    const chartView = view === "chart";
+    mapPanel.classList.toggle("chart-view", chartView);
+
+    mapViewToggle?.querySelectorAll("button").forEach((button) => {
+        const active = button.dataset.view === view;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-pressed", String(active));
+    });
+
+    if (chartView) {
+        requestAnimationFrame(() => mapChart?.resize());
+    }
+
+    document.dispatchEvent(new CustomEvent("map-view-change", { detail: { view } }));
+}
+
+if (mapViewToggle) {
+    mapViewToggle.addEventListener("click", (event) => {
+        const button = event.target.closest("button[data-view]");
+        if (!button) {
+            return;
+        }
+        setMapView(button.dataset.view);
     });
 }
 
