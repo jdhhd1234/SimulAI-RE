@@ -50,8 +50,9 @@ AUTO_SCENARIOS = [
     ("Down Under Outpost", "Australia", -33.8688, 151.2093),
     ("Bering Watch", "Canada", 45.4215, -75.6972),
 ]
+
 AUTO_COMPANIES_TO_ADD = 10
-AUTO_CADENCE_SECONDS = 5.0
+AUTO_CADENCE_SECONDS = 0.1
 
 companies_lock = threading.Lock()
 _auto_stop = threading.Event()
