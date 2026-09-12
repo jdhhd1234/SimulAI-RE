@@ -25,7 +25,7 @@ class CountryEconomic:
     def gdp_func(self, model: Model, sell):
         """GDP는 국내총생산이라서 여기에 뭐 국내생산에 다 들어감"""
         gdp = model.converter("gdp")
-        gdp.equation = sell * self.tax_rate
+        gdp.equation = sell
 
         return gdp
 
@@ -35,18 +35,19 @@ class CountryEconomic:
 
         return tax_revenue
     
-    def hire_func(self, model: Model, population):
+    def hire_func(self, model: Model, population, labor):
         # 일단 지금은 복잡하게 말고 random으로 처리(# 2026/09/07)
+        # 2026/09/12: sd.uniform으로 변경해 매 turn 재평가되도록 하고, population을 넘겨 고용하지 않도록 남은 인원(population - labor)으로 제한
         hire = model.flow("hire")
-        hire.equation = np.random.randint(1, population)
-        
+        available = population - labor
+        hire.equation = sd.max(sd.min(sd.uniform(1, available), available), 0)
+
         return hire
-    
-    def labor_func(self, model: Model, hire):
-        
-        labor = model.stock("labor")
+
+    def labor_func(self, model: Model, hire, labor):
+
         labor.equation = hire
-        
+
         return labor
     
     def production_func(self, model: Model, labor_count):
@@ -74,8 +75,9 @@ class CountryEconomic:
         )
         
         
-        hire = self.hire_func(model, self.population)
-        labor = self.labor_func(model, hire)
+        labor = model.stock("labor")
+        hire = self.hire_func(model, self.population, labor)
+        labor = self.labor_func(model, hire, labor)
         production = self.production_func(model, labor)
         sell = self.sell_func(model, 1000, production)
         
