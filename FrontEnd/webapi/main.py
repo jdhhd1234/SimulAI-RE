@@ -22,7 +22,7 @@ class CompanyInput(BaseModel):
     longitude: float
     gdp: float = 100000.0
     population: float = 1200000.0
-    tax_rate: float = 12.0
+    tax_rate: float = 0.12
     resource_power: float = 7.0
 
 
@@ -82,7 +82,7 @@ def _auto_generate_companies():
         name, country, latitude, longitude = scenario
         gdp = random.randint(50000, 900000)
         population = random.randint(400000, 3500000)
-        tax_rate = round(random.uniform(5.0, 18.0), 2)
+        tax_rate = round(random.uniform(0.05, 0.18), 4)
         resource_power = random.randint(1, 10)
 
         try:

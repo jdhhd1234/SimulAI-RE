@@ -50,11 +50,11 @@ class CountryEconomic:
 
         return labor
     
-    def production_func(self, model: Model, labor_count):
+    def production_func(self, model: Model, labor_count, resource_power):
         
-        # 노동자 한명당 일단 5개씩 생산
-        production = model.stock("production")
-        production.equation = labor_count * 5
+        # 노동자 한명당 5개씩 생산 × 자원력 (매 턴 유량)
+        production = model.converter("production")
+        production.equation = labor_count * 5 * resource_power
         
         return production
     
@@ -78,8 +78,9 @@ class CountryEconomic:
         labor = model.stock("labor")
         hire = self.hire_func(model, self.population, labor)
         labor = self.labor_func(model, hire, labor)
-        production = self.production_func(model, labor)
-        sell = self.sell_func(model, 1000, production)
+        production = self.production_func(model, labor, self.resource_power)
+        sell_price = self.gdp / self.population
+        sell = self.sell_func(model, sell_price, production)
         
         gdp = self.gdp_func(model, sell)
 
