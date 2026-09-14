@@ -29,9 +29,11 @@ class CountryEconomic:
 
         return gdp
 
-    def tax_revenue_func(self, model: Model, gdp, tax_rate):
+    def tax_revenue_func(self, model: Model, gdp, tax_rate, company_profit=0, corporate_tax_rate=0.0):
+        # 2026/09/14: company_mdl.py 연동 시 기업 profit에 법인세(corporate_tax_rate)를 매겨 세수에 합산.
+        # company_profit/corporate_tax_rate를 안 넘기면 기존과 동일하게 소비세수(gdp * tax_rate)만 계산됨.
         tax_revenue = model.converter("tax_revenue")
-        tax_revenue.equation = gdp * tax_rate
+        tax_revenue.equation = gdp * tax_rate + company_profit * corporate_tax_rate
 
         return tax_revenue
     
