@@ -1,5 +1,6 @@
 from BPTK_Py import Model
 from BPTK_Py import Agent, Event
+from BPTK_Py import sd_functions as sd
 
 import random
 
@@ -8,33 +9,28 @@ import random
 # 일단 기업수요는 예외처리 하겠음
 # 소비자들이 물건을 살지 안살지는 일단 random으로 하겠음
 
-class MarketModel(Model):
-
-    def instantiate_model(self):
-        self.register_agent_factory(
-            agent_type="consumer",
-            agent_factory=lambda agent_id, model, properties: Market(agent_id, model, properties)
-        )
-
-class Market(Agent):
+class BasicConsumer(Agent):
 
     def initialize(self):
-
         self.agent_type = "consumer"
-        self.assets = 12000
+        self.state = "idle"
+        self.set_property("remaining_effort", {"type": "Double", "value": self.effort})
 
-        self.price = 3000
+        # 2026/09/15: 이거는 소비자가 구입을 하지도 사지도 않는 즉 대기상태.
+        self.register_event_handler(["idle"], "consumer_idle", self.consumer_idle)
 
-        # 일단 살지 안살지는 random으로 결정 buy or wait (2026/09/10)
-    
+        # 2026/09/15: 이거는 소비자가 구입을 하는상황.
+        self.register_event_handler(["buy"], "consumer_buy", self.consumer_buy)
 
-    def act(self, time, round_no, step_no):
+        return super().initialize()
 
-        self.state = random.choice(["buy", "wait"])
+    def randomMoney(self):
+        # 2026/09/15: 랜덤으로 돈을 소비자한테 주는 함수.
+        return sd.Random(1, 10000)
 
-        if self.state == "buy":
+    def consumer_idle(self, event):
+        # 아무것도 안하는 상태: 소비도 구입도 하지 않고 state를 "idle"로 유지한다.
+        return
 
-            # 2026/09/10
-            # 여기서 빠져나간돈이 기업으로 가야함
-            # 근데 기업구현이 아직 안됨
-            self.assets -= self.price
+    def consumer_buy(self, event):
+        pass
