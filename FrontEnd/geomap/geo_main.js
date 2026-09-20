@@ -6,8 +6,18 @@ const status = document.querySelector("#status");
 
 let map;
 let markerLayer;
+let countryLayer;
 let coordinateMarker;
 let knownCompanyIds = new Set();
+let countriesLoaded = false;
+let territoryOwners = {};
+
+const COUNTRY_ALIASES = {
+    "United States": "United States of America",
+    "USA": "United States of America",
+    "UK": "United Kingdom",
+    "Korea": "South Korea",
+};
 
 function escapeHtml(value) {
     return String(value ?? "")
@@ -61,6 +71,87 @@ function createPopup(company) {
     `;
 }
 
+function normalizeCountry(name) {
+    const key = String(name ?? "").trim();
+    return COUNTRY_ALIASES[key] || key;
+}
+
+function countryStyle(feature) {
+    const owner = territoryOwners[normalizeCountry(feature.properties.name)];
+    if (!owner) {
+        return {
+            color: "#3a3a3a",
+            weight: 1,
+            fillColor: "#2a2a2a",
+            fillOpacity: 0.25,
+        };
+    }
+
+    return {
+        color: "#ffffff",
+        weight: 1,
+        fillColor: owner.color,
+        fillOpacity: 0.75,
+    };
+}
+
+function bindCountryTooltip(feature, layer) {
+    layer.bindTooltip(() => {
+        const owner = territoryOwners[normalizeCountry(feature.properties.name)];
+        return `
+            <div class="map-popup">
+                <h3>${escapeHtml(feature.properties.name)}</h3>
+                <p>${escapeHtml(owner ? owner.company_name : "미점령")}</p>
+            </div>
+        `;
+    }, {
+        sticky: true,
+        className: "company-tooltip",
+    });
+}
+
+async function loadTerritories() {
+    try {
+        const response = await fetch("/territories");
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const territories = await response.json();
+        territoryOwners = {};
+        territories.forEach((territory) => {
+            territoryOwners[normalizeCountry(territory.country)] = territory;
+        });
+        countryLayer?.setStyle(countryStyle);
+    } catch (error) {
+        console.error("Failed to load territories:", error);
+    }
+}
+
+async function loadCountries() {
+    if (!map || countriesLoaded) {
+        return;
+    }
+    countriesLoaded = true;
+
+    try {
+        const response = await fetch("/geomap/countries.geojson");
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        countryLayer = L.geoJSON(data, {
+            style: countryStyle,
+            onEachFeature: bindCountryTooltip,
+        }).addTo(map);
+        countryLayer.bringToBack();
+        await loadTerritories();
+    } catch (error) {
+        console.error("Failed to load country borders:", error);
+    }
+}
+
 function createMap() {
     if (!mapElement || typeof L === "undefined" || map) {
         return;
@@ -73,6 +164,8 @@ function createMap() {
         attribution: "&copy; OpenStreetMap contributors",
         maxZoom: 18,
     }).addTo(map);
+
+    loadCountries();
 
     map.invalidateSize();
 
@@ -112,6 +205,7 @@ function renderCompanies(companies) {
     }
 
     markerLayer.clearLayers();
+    loadTerritories();
     companies.forEach((company) => {
         L.circleMarker([company.latitude, company.longitude], {
             radius: 8,

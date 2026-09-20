@@ -1,7 +1,7 @@
 from BPTK_Py import Model
 
 from calc.base.country_mdl import CountryEconomic
-from calc.base.company_mdl import CompanySDModel, print_company_result
+from calc.base.company_mdl import SectorFactoryModel, print_company_result
 
 # 2026/09/14: country_mdl(국가경제)과 company_mdl(기업)을 하나의 Model로 연동해서 실행한다.
 # 연동 지점: 기업 profit -> 국가 tax_revenue (법인세로 합산)
@@ -14,7 +14,7 @@ def mainRun(corporate_tax_rate=0.2):
         name="IntegratedModel",
     )
 
-    company = CompanySDModel(
+    company = SectorFactoryModel(
         resource_price=10.0,
         sell_price=100.0,
         product_count=50.0,

@@ -58,6 +58,12 @@ companies_lock = threading.Lock()
 _auto_stop = threading.Event()
 _auto_added = 0
 
+# 영토 소유 표시용 색상 팔레트 (company id 해시로 안정 배정)
+TERRITORY_COLORS = [
+    "#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231",
+    "#911eb4", "#46f0f0", "#f032e6", "#bcf60c", "#fabebe",
+]
+
 
 def _next_company_id():
     numbers = []
@@ -139,9 +145,39 @@ def company_summary(company):
     }
 
 
+def _territory_color(company_id):
+    index = sum(ord(char) for char in company_id)
+    return TERRITORY_COLORS[index % len(TERRITORY_COLORS)]
+
+
+def _company_power(company):
+    latest = company["data"][-1]
+    power = latest.get("production", 0)
+    return float(power) if isinstance(power, (int, float)) else 0.0
+
+
 @app.get("/data")
 def get_data():
     return data
+
+
+@app.get("/territories")
+def get_territories():
+    # 국가별로 가장 강한(production 기준) 자산이 해당 국가 영토를 점유한다.
+    owners = {}
+    for company in companies:
+        country = company["country"]
+        power = _company_power(company)
+        current = owners.get(country)
+        if current is None or power > current["power"]:
+            owners[country] = {
+                "country": country,
+                "company_id": company["id"],
+                "company_name": company["name"],
+                "power": power,
+                "color": _territory_color(company["id"]),
+            }
+    return list(owners.values())
 
 
 @app.get("/country")
