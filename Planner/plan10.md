@@ -21,3 +21,26 @@
 GPT의 추천:
 sector 점수는 국가의 산업 수준/기술력, 
 공장 시스템은 실제 생산량으로 보는 게 좋아.
+
+# 2026/09/21
+
+좀 방향을 바꾸기로 한다. 엔진과 모딩 영역으로
+
+1. 엔진 (Python/C++)
+- 연산 고수준 API
+- Agent껍대기
+- System Dynamics API
+
+2. 유저모딩(Lua)
+- API사용
+- 국가정의
+- 연산로직작성
+
+3. 오늘할것
+
+- SD에서 stock, flow, equation만 Lua API화 시켜보기
+
+미래내용
+
+- MakeUnit(param..)
+유닛을 만드는 함수
