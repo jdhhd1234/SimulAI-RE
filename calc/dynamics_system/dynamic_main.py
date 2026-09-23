@@ -11,7 +11,6 @@ class ModelSystemDynamics:
         self.dt = dt
         self.name = name
     
-    
     def system_dynamics_makeModel_func(self):
         
         model = Model(
@@ -72,23 +71,3 @@ class SystemDynamics:
         converter_name.equation = formula
         
         return converter_name
-
-# Test Zone
-sd_Test = SystemDynamics()
-
-model = Model(
-    starttime=0.0,
-    stoptime=5.0,
-    dt=1.0,
-    name="IntegratedModel",
-)
-
-inflow = model.flow("inflow")
-inflow.equation = 10
-
-stock = SystemDynamics().system_dynamics_stock_func(
-    model=model,
-    name="population",
-    formula=inflow - 2,
-    init_value=100.0
-)

@@ -43,3 +43,43 @@
     - 이익
     - 연구 / 임금 / 세금
     - 현금
+
+## 2026/09/21 Big Fix Flow
+
+엔진과 모딩영역은 나누기
+
+1. 엔진(Python/C++)
+- 유닛생성
+- System Dynamics의 복잡성을 덜어내는 추상화 API
+- Agent Based Model의 복잡성을 덜어내는 추상화 API
+
+2. 모딩(Lua)
+- API를 사용하여 유닛을 설정하고 
+- Web UI를 사용하여 지도와 병력위치를 설정한다
+
+### ChatGPT의 말:
+Python/C++ Engine
+- Unit/Formation/Weapon/Terrain 같은 핵심 도메인 객체
+- SD 추상화 API
+- ABM 추상화 API
+- Simulation Tick / Time
+- Event System
+- Save/Load
+- Lua Binding
+- 가능하면 BPTK-Py 타입은 여기 밖으로 노출하지 않음
+
+Lua Modding
+- 유닛 스탯
+- 무기/센서
+- 교전 규칙
+- 보급/사기/손실 공식
+- 이벤트와 트리거
+- 승리 조건
+
+Web UI
+- 지도 편집
+- 유닛 배치
+- Faction 설정
+- Waypoint/Objective 설정
+- 시나리오 시간대와 환경 설정
+- 결과 시각화
