@@ -21,6 +21,7 @@
                     <input id="debug-mode" type="checkbox">
                     전투 정보 모드
                 </label>
+                <a href="/lua-ui/">Lua 경제</a>
                 <p id="status">로딩 중...</p>
             </div>
         </header>
@@ -40,17 +41,13 @@
                 </div>
 
                 <section class="editor-section">
-                    <p class="eyebrow">자산 배치</p>
-                    <h3>자산 등록</h3>
-                    <p class="editor-help">지도를 클릭하여 좌표를 선택하세요.</p>
+                    <p class="eyebrow">위치</p>
+                    <h3>위치 추가</h3>
+                    <p class="editor-help">지도를 클릭하여 좌표를 선택하세요. 추가한 위치는 Lua의 locations 테이블로 전달됩니다.</p>
                     <form id="company-form">
                         <label>
-                            자산명
-                            <input name="name" type="text" placeholder="Example Corp" required>
-                        </label>
-                        <label>
-                            국가
-                            <input name="country" type="text" placeholder="South Korea" required>
+                            이름
+                            <input name="name" type="text" placeholder="포항">
                         </label>
                         <div class="form-row">
                             <label>
@@ -62,28 +59,20 @@
                                 <input name="longitude" type="number" min="-180" max="180" step="any" placeholder="126.9780" required>
                             </label>
                         </div>
-                        <div class="form-row">
-                            <label>
-                                GDP
-                                <input name="gdp" type="number" min="0" step="any" value="100000" required>
-                            </label>
-                            <label>
-                                인구
-                                <input name="population" type="number" min="1" step="any" value="1200000" required>
-                            </label>
-                        </div>
-                        <div class="form-row">
-                            <label>
-                                세율
-                                <input name="tax_rate" type="number" min="0" step="any" value="12" required>
-                            </label>
-                            <label>
-                                자원력
-                                <input name="resource_power" type="number" min="0" step="any" value="7" required>
-                            </label>
-                        </div>
-                        <button type="submit">시뮬레이션 실행</button>
+                        <button type="submit">위치 추가</button>
                         <p id="company-form-status" role="status"></p>
+                    </form>
+                    <div id="location-list" class="company-list"></div>
+                </section>
+
+                <section class="editor-section">
+                    <p class="eyebrow">Lua 시나리오</p>
+                    <h3>Lua 코드 실행</h3>
+                    <p class="editor-help">LuaPy 폴더의 .lua 파일을 실행하면 지도에 사업장이 표시됩니다.</p>
+                    <form id="lua-form">
+                        <select id="lua-file"></select>
+                        <button type="submit">Lua 실행</button>
+                        <p id="lua-status" role="status"></p>
                     </form>
                 </section>
 
@@ -147,5 +136,6 @@
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="/geomap/geo_main.js"></script>
     <script src="main.js"></script>
+    <script src="lua_panel.js"></script>
 </body>
 </html>

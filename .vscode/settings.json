@@ -1,5 +1,6 @@
 {
     "python.analysis.autoImportCompletions": false,
     "python.analysis.typeCheckingMode": "basic",
-    "python.analysis.languageServerMode": "default"
+    "python.analysis.languageServerMode": "default",
+    "python.analysis.extraPaths": ["./calc"]
 }

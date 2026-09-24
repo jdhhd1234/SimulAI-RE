@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SimulAI-RE Lua</title>
+    <style>
+        body { background: #111; color: #ddd; font-family: sans-serif; margin: 0; padding: 16px; }
+        h1, h2 { font-weight: 500; }
+        .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        select, input, button { background: #222; color: #ddd; border: 1px solid #444; padding: 6px 10px; }
+        input { width: 70px; }
+        button { cursor: pointer; }
+        #status { color: #888; }
+        #status.error { color: #e57373; }
+        .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+        pre { background: #1a1a1a; border: 1px solid #333; padding: 12px; overflow: auto; max-height: 420px; }
+        .chart-box { position: relative; height: 420px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #333; padding: 6px 10px; text-align: left; }
+        @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <h1>Lua 경제 시뮬레이션</h1>
+    <p>Lua 코드는 개인 컴퓨터의 LuaPy 폴더에서 작성하고, 여기서는 실행과 결과만 확인합니다.</p>
+
+    <div class="controls">
+        <select id="lua-file"></select>
+        <label>시작 <input id="start" type="number" value="0"></label>
+        <label>종료 <input id="stop" type="number" value="10" max="200"></label>
+        <label>dt <input id="dt" type="number" value="1" min="0.1" step="any"></label>
+        <button id="run" type="button">실행</button>
+        <span id="status"></span>
+    </div>
+
+    <div class="layout">
+        <section>
+            <h2>Lua 코드 (읽기 전용)</h2>
+            <pre id="source"></pre>
+        </section>
+        <section>
+            <h2>시간별 결과</h2>
+            <div class="chart-box"><canvas id="chart"></canvas></div>
+        </section>
+    </div>
+
+    <h2>Sector</h2>
+    <table id="sector-table">
+        <thead>
+            <tr><th>sector</th><th>영향을 받음</th><th>영향을 줌</th><th>사업장 수</th><th>종사자</th><th>최대생산량</th><th>위치</th></tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="lua.js"></script>
+</body>
+</html>

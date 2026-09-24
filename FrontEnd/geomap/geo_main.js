@@ -284,52 +284,6 @@ async function loadCompanies(selectedId, showResults = false) {
     }
 }
 
-async function addCompany(event) {
-    event.preventDefault();
-    formStatus.textContent = "추가 중...";
-
-    const formData = new FormData(companyForm);
-    const company = {
-        name: formData.get("name"),
-        country: formData.get("country"),
-        latitude: Number(formData.get("latitude")),
-        longitude: Number(formData.get("longitude")),
-    };
-
-    [
-        "gdp",
-        "population",
-        "tax_rate",
-        "resource_power",
-    ].forEach((field) => {
-        company[field] = Number(formData.get(field));
-    });
-
-    try {
-        const response = await fetch("/companies", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(company),
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || `HTTP ${response.status}`);
-        }
-
-        companyForm.reset();
-        formStatus.textContent = "자산 추가됨";
-        const createdCompany = await response.json();
-        await loadCompanies(createdCompany.id, true);
-    } catch (error) {
-        formStatus.textContent = `Failed: ${error.message}`;
-    }
-}
-
-if (companyForm) {
-    companyForm.addEventListener("submit", addCompany);
-}
-
 const infoPanel = document.querySelector(".info-panel");
 if (infoPanel) {
     infoPanel.addEventListener("resize", () => {

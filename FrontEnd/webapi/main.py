@@ -3,12 +3,14 @@ import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+import lupa
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-import calc.base.country_mdl as country_mdl
+import LuaPy.country_mdl as country_mdl
+from LuaPy.lua_bridge import LuaBridge
 
 # uvicorn FrontEnd.webapi.main:app --reload
 data = country_mdl.mainRun(False)
@@ -34,22 +36,6 @@ companies = [{
     "longitude": 126.9780,
     "data": data,
 }]
-
-
-# country_mdl -> API -> FrontEnd 자동 등록 피드
-# country_mdl은 수정하지 않고, 여기서만 주기적으로 mainRun을 호출한다.
-AUTO_SCENARIOS = [
-    ("East Bloc Command", "Russia", 55.7558, 37.6173),
-    ("Pacific Front", "Japan", 35.6762, 139.6503),
-    ("Ironworks Alliance", "Germany", 52.5200, 13.4050),
-    ("Atlantic Sentinel", "United States", 40.7128, -74.0060),
-    ("Sahara Vanguard", "Egypt", 30.0444, 31.2357),
-    ("Amazon Front", "Brazil", -15.8267, -47.9218),
-    ("Himalaya Corps", "India", 28.6139, 77.2090),
-    ("Cape Defense", "South Africa", -33.9249, 18.4241),
-    ("Down Under Outpost", "Australia", -33.8688, 151.2093),
-    ("Bering Watch", "Canada", 45.4215, -75.6972),
-]
 
 AUTO_COMPANIES_TO_ADD = 10
 AUTO_CADENCE_SECONDS = 0.1
@@ -84,8 +70,6 @@ def _append_company(company):
 def _auto_generate_companies():
     global _auto_added
     while _auto_added < AUTO_COMPANIES_TO_ADD and not _auto_stop.is_set():
-        scenario = AUTO_SCENARIOS[_auto_added % len(AUTO_SCENARIOS)]
-        name, country, latitude, longitude = scenario
         gdp = random.randint(50000, 900000)
         population = random.randint(400000, 3500000)
         tax_rate = round(random.uniform(0.05, 0.18), 4)
@@ -103,17 +87,6 @@ def _auto_generate_companies():
             print(f"[AUTO] 시뮬레이션 실패: {error}")
             _auto_stop.wait(AUTO_CADENCE_SECONDS)
             continue
-
-        company = _append_company({
-            "name": name,
-            "country": country,
-            "latitude": latitude,
-            "longitude": longitude,
-            "data": company_data,
-        })
-        _auto_added += 1
-        print(f"[AUTO] 자산 자동 등록: {company['name']} ({company['id']})")
-        _auto_stop.wait(AUTO_CADENCE_SECONDS)
 
 
 @asynccontextmanager
@@ -217,7 +190,122 @@ def add_company(company_input: CompanyInput):
     return company_summary(company_record)
 
 
+# 2026/09/24: Lua 경제 시뮬레이션 WebUI API (구 lua_api.py 통합).
+# Lua는 개인 컴퓨터의 LuaPy/*.lua 파일로 작성하고, 웹은 실행과 결과 표시만 한다.
+# 브라우저에서 Lua 코드를 받아 실행하지 않는다(로컬 파일 이름만 받는다).
+# 화면: /lua-ui/  (country.lua는 params를 Python이 넣어주는 파일이라 목록에서 뺀다)
+LUA_DIR = Path(__file__).resolve().parents[2] / "LuaPy"
+LUA_HIDDEN_FILES = ("country.lua",)
+
+
+def _lua_path(name: str):
+    path = (LUA_DIR / name).resolve()
+    if path.parent != LUA_DIR or path.suffix != ".lua" or not path.is_file():
+        raise HTTPException(status_code=404, detail="Lua file not found")
+    return path
+
+
+@app.get("/lua/files")
+def list_lua_files():
+    names = []
+    for path in sorted(LUA_DIR.glob("*.lua")):
+        if path.name not in LUA_HIDDEN_FILES:
+            names.append(path.name)
+    return names
+
+
+@app.get("/lua/files/{name}")
+def get_lua_source(name: str):
+    return {"name": name, "source": _lua_path(name).read_text(encoding="utf-8")}
+
+
+# 2026/09/24: UI에서 추가한 위치. Lua 실행 때 전역 locations 테이블로 전달된다. (메모리 저장)
+class LocationInput(BaseModel):
+    name: str = ""
+    latitude: float
+    longitude: float
+
+
+locations = []
+_location_seq = 0
+
+
+@app.get("/locations")
+def get_locations():
+    return locations
+
+
+@app.post("/locations")
+def add_location(location_input: LocationInput):
+    global _location_seq
+    _location_seq += 1
+    location = {
+        "id": f"loc-{_location_seq}",
+        "name": location_input.name.strip() or f"위치 {_location_seq}",
+        "latitude": location_input.latitude,
+        "longitude": location_input.longitude,
+    }
+    locations.append(location)
+    return location
+
+
+@app.delete("/locations/{location_id}")
+def delete_location(location_id: str):
+    for location in locations:
+        if location["id"] == location_id:
+            locations.remove(location)
+            return location
+    raise HTTPException(status_code=404, detail="Location not found")
+
+
+@app.post("/lua/run/{name}")
+def run_lua(
+    name: str,
+    start: float = 0,
+    stop: float = Query(10, le=200),
+    dt: float = Query(1, gt=0),
+    to_map: bool = False,
+):
+    path = _lua_path(name)
+
+    try:
+        bridge = LuaBridge(start, stop, dt, "web_lua_economy")
+        bridge.set_locations(locations)
+        bridge.run_file(str(path))
+        result = bridge.series()
+        records = bridge.map_records() if to_map else []
+    except (lupa.LuaError, Exception) as error:
+        raise HTTPException(status_code=400, detail=f"{type(error).__name__}: {error}")
+
+    # to_map: Lua 사업장을 지도의 자산(companies)으로 등록한다. 다시 실행하면 이전 Lua 자산을 교체한다.
+    company_ids = []
+    if to_map:
+        with companies_lock:
+            companies[:] = [company for company in companies if company.get("source") != "lua"]
+        for record in records:
+            record["source"] = "lua"
+            company_ids.append(_append_company(record)["id"])
+    result["company_ids"] = company_ids
+
+    sectors = []
+    seen = []
+    for establishment in bridge.establishments:
+        sector_id = establishment["sector"]
+        if sector_id in seen:
+            continue
+        seen.append(sector_id)
+        sectors.append({
+            "link": bridge.factory.sector_link(sector_id, bridge.establishments),
+            "summary": bridge.factory.sector_summary(sector_id, bridge.establishments),
+        })
+
+    result["sectors"] = sectors
+    return result
+
+
 frontend_dir = Path(__file__).resolve().parents[1] / "main"
 geomap_dir = Path(__file__).resolve().parents[1] / "geomap"
+lua_ui_dir = Path(__file__).resolve().parents[1] / "lua"
 app.mount("/geomap", StaticFiles(directory=geomap_dir), name="geomap")
+app.mount("/lua-ui", StaticFiles(directory=lua_ui_dir, html=True), name="lua_frontend")
 app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
