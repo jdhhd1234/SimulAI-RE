@@ -83,6 +83,15 @@ def _auto_generate_companies():
                 resource_power=resource_power,
             )
             company_data = country_mdl.mainRun(False, company=simulation)
+            _append_company({
+                "name": f"Auto Company {_auto_added + 1}",
+                "country": "Unknown",
+                "latitude": random.uniform(-60, 60),
+                "longitude": random.uniform(-180, 180),
+                "data": company_data,
+                "source": "auto",
+            })
+            _auto_added += 1
         except Exception as error:
             print(f"[AUTO] 시뮬레이션 실패: {error}")
             _auto_stop.wait(AUTO_CADENCE_SECONDS)
@@ -138,7 +147,9 @@ def get_data():
 def get_territories():
     # 국가별로 가장 강한(production 기준) 자산이 해당 국가 영토를 점유한다.
     owners = {}
-    for company in companies:
+    with companies_lock:
+        saved_companies = list(companies)
+    for company in saved_companies:
         country = company["country"]
         power = _company_power(company)
         current = owners.get(country)
@@ -160,15 +171,28 @@ def get_country():
 
 @app.get("/companies")
 def get_companies():
-    return [company_summary(company) for company in companies]
+    with companies_lock:
+        saved_companies = list(companies)
+    return [company_summary(company) for company in saved_companies]
 
 
 @app.get("/companies/{company_id}")
 def get_company(company_id: str):
-    company = next((item for item in companies if item["id"] == company_id), None)
+    with companies_lock:
+        company = next((item for item in companies if item["id"] == company_id), None)
     if company is None:
         raise HTTPException(status_code=404, detail="Company not found")
     return company
+
+
+@app.delete("/companies/{company_id}")
+def delete_company(company_id: str):
+    with companies_lock:
+        for index, company in enumerate(companies):
+            if company["id"] == company_id:
+                deleted = companies.pop(index)
+                return company_summary(deleted)
+    raise HTTPException(status_code=404, detail="Company not found")
 
 
 @app.post("/companies")
@@ -228,33 +252,36 @@ class LocationInput(BaseModel):
 
 locations = []
 _location_seq = 0
+locations_lock = threading.Lock()
 
 
 @app.get("/locations")
 def get_locations():
-    return locations
+    with locations_lock:
+        return list(locations)
 
 
 @app.post("/locations")
 def add_location(location_input: LocationInput):
     global _location_seq
-    _location_seq += 1
-    location = {
-        "id": f"loc-{_location_seq}",
-        "name": location_input.name.strip() or f"위치 {_location_seq}",
-        "latitude": location_input.latitude,
-        "longitude": location_input.longitude,
-    }
-    locations.append(location)
+    with locations_lock:
+        _location_seq += 1
+        location = {
+            "id": f"loc-{_location_seq}",
+            "name": location_input.name.strip() or f"위치 {_location_seq}",
+            "latitude": location_input.latitude,
+            "longitude": location_input.longitude,
+        }
+        locations.append(location)
     return location
 
 
 @app.delete("/locations/{location_id}")
 def delete_location(location_id: str):
-    for location in locations:
-        if location["id"] == location_id:
-            locations.remove(location)
-            return location
+    with locations_lock:
+        for index, location in enumerate(locations):
+            if location["id"] == location_id:
+                return locations.pop(index)
     raise HTTPException(status_code=404, detail="Location not found")
 
 
@@ -270,7 +297,9 @@ def run_lua(
 
     try:
         bridge = LuaBridge(start, stop, dt, "web_lua_economy")
-        bridge.set_locations(locations)
+        with locations_lock:
+            saved_locations = list(locations)
+        bridge.set_locations(saved_locations)
         bridge.run_file(str(path))
         result = bridge.series()
         records = bridge.map_records() if to_map else []
@@ -288,15 +317,10 @@ def run_lua(
     result["company_ids"] = company_ids
 
     sectors = []
-    seen = []
-    for establishment in bridge.establishments:
-        sector_id = establishment["sector"]
-        if sector_id in seen:
-            continue
-        seen.append(sector_id)
+    for sector_id in bridge.factory.sectors:
         sectors.append({
-            "link": bridge.factory.sector_link(sector_id, bridge.establishments),
-            "summary": bridge.factory.sector_summary(sector_id, bridge.establishments),
+            "link": bridge.sector_link(sector_id),
+            "summary": bridge.sector_summary(sector_id),
         })
 
     result["sectors"] = sectors

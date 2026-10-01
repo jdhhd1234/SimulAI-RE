@@ -1,22 +1,27 @@
-import dynamics_system.dynamic_main as dm
-import dynamics_system.dynamic_sector as ds
+import sys
+from pathlib import Path
 
-model = dm.ModelSystemDynamics(0, 10, 1, "test_model").system_dynamics_makeModel_func()
-factory = ds.SystemDynamicMakeSector()
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-steel_sector = factory.make_sector("steel", "철강")
-car_sector = factory.make_sector("car", "자동차")
+import calc.dynamics_system.dynamic_sector as ds
 
-steel_good = factory.make_good("steel", "톤")
-car_good = factory.make_good("car", "대")
+factory = ds.SystemDynamicSector()
 
-steel_recipe = factory.set_recipe("steel", inputs={}, labor=100, capacity=1000)
-car_recipe = factory.set_recipe("car", inputs={"steel": 2}, labor=50, capacity=200)
+steel_sector = factory.make_sector("steel")
+car_sector = factory.make_sector("car")
 
-steel_establishment = factory.make_establishment(model, "steel", (0, 0), steel_recipe, capital=5000)
-car_establishment = factory.make_establishment(model, "car", (1, 1), car_recipe, capital=8000)
+steel_recipe = factory.make_recipe("steel_recipe", "iron", "steel", 0.9)
+car_recipe = factory.make_recipe("car_recipe", "steel", "car", 0.5)
+iron = factory.set_resource("iron", 1000, 100, 1.0, 0.8)
 
-establishments = [steel_establishment, car_establishment]
+steel_factory = factory.sector_create_factory(0, 0, steel_sector)
+car_factory = factory.sector_create_factory(1, 1, car_sector)
+factory.sector_factory_setting(steel_factory, recipe=steel_recipe["name"], capacity=1000)
+factory.sector_factory_setting(car_factory, recipe=car_recipe["name"], capacity=200)
 
-print(factory.sector_link("car", establishments))
-print(factory.sector_link("steel", establishments))
+assert factory.sector_supply_chain(100, 0.9, iron) == 72.0
+assert iron["reserve"] == 900
+assert len(steel_sector["factories"]) == 1
+assert len(car_sector["factories"]) == 1
+
+print(factory.sectors)

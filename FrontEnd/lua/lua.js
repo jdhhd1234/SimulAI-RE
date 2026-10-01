@@ -71,13 +71,13 @@ function renderSectors(sectors) {
     sectors.forEach((sector) => {
         const row = document.createElement("tr");
         const cells = [
-            sector.summary.sector_id,
-            sector.link.influenced_by.join(", ") || "-",
-            sector.link.influences.join(", ") || "-",
-            sector.summary.establishment_count,
-            sector.summary.labor,
-            sector.summary.production_capacity,
-            sector.summary.locations.map((pos) => `(${pos[0]}, ${pos[1]})`).join(" "),
+            sector.summary.sector,
+            sector.link.recipes
+                .map((recipe) => `${recipe.input} -> ${recipe.output} (${recipe.yield_rate})`)
+                .join(", ") || "-",
+            sector.summary.factory_count,
+            sector.summary.capacity,
+            sector.summary.locations.map((pos) => `(${pos[0]}, ${pos[1]})`).join(" ") || "-",
         ];
         cells.forEach((value) => {
             const cell = document.createElement("td");

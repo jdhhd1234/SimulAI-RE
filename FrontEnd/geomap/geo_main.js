@@ -233,11 +233,22 @@ function renderCompanyList(companies, selectedId) {
         <div class="company-item${company.id === selectedId ? " selected" : ""}" data-id="${escapeHtml(company.id)}">
             <strong>${escapeHtml(company.name)}</strong>
             <span>${escapeHtml(company.country)}</span>
+            <button type="button" class="company-remove" data-id="${escapeHtml(company.id)}">삭제</button>
         </div>
     `).join("");
 
     companyList.querySelectorAll(".company-item").forEach((item) => {
-        item.addEventListener("click", () => loadCompanies(item.dataset.id, true));
+        item.addEventListener("click", (event) => {
+            if (event.target.closest(".company-remove")) {
+                return;
+            }
+            loadCompanies(item.dataset.id, true);
+        });
+    });
+    companyList.querySelectorAll(".company-remove").forEach((button) => {
+        button.addEventListener("click", () => {
+            deleteCompany(button.dataset.id);
+        });
     });
 }
 
@@ -254,6 +265,23 @@ async function loadCompanyData(companyId, showResults) {
             showResults,
         },
     }));
+}
+
+async function deleteCompany(companyId) {
+    try {
+        const response = await fetch(`/companies/${encodeURIComponent(companyId)}`, { method: "DELETE" });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        await loadCompanies(undefined, false);
+        if (status) {
+            status.textContent = "자산이 삭제되었습니다.";
+        }
+    } catch (error) {
+        if (status) {
+            status.textContent = `삭제 실패: ${error.message}`;
+        }
+    }
 }
 
 async function loadCompanies(selectedId, showResults = false) {

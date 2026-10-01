@@ -3,6 +3,11 @@ from BPTK_Py import sd_functions as sd
 
 from typing import Any
 
+"""
+**경고** 이 Class는 저수준API입니다.
+Lua에서는 거의 쓰지 마십시요.
+
+"""
 class ModelSystemDynamics:
     
     def __init__(self, start_time, stop_time, dt, name: str) -> None:
