@@ -5,7 +5,7 @@ import lupa
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import calc.dynamics_system.dynamic_main as dm
+import dynamics_system.dynamic_lowlevel as dm
 import calc.dynamics_system.dynamic_sector as ds
 
 

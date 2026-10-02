@@ -112,3 +112,46 @@ sector쪽을 좀더 보강한다.
 2. capital은 계속 쌓이는데 output이 아예 쌓이지 않음.
 3. 중요한 핵심 SD공식을 Lua모더한테 떠넘기고 있음 이 해결이 매우 중요할거 같음.
 4. 저수준API는 있는데 고수준API가 부족하여 이 점이 중요한거 같음.
+
+
+
+# 2026/10/02
+
+## 오늘계획 (2시간)
+
+sector에서 sector_supply_chain 함수 부분을 매우 강화시킨다
+
+1. BPTK-Py를 사용해서 기존에 생성되어있는 Sector들을 자동으로 엮어준다. 마치 밑에 이런식으로
+
+"""lua
+oil_res = set_resource(
+    "oil",
+    1200000, -- initial stock
+    10000,   -- extraction / supply capacity
+    30.0     -- price or base value
+)
+
+oil_fact = sector_create_factory(
+    "oil",
+    120.0,   -- production capacity
+    50.0     -- efficiency / cost etc.
+)
+
+iron_res = set_resource("iron", 800000, 8000, 20.0)
+chrome_res = set_resource("chrome", 100000, 1000, 80.0)
+carbon_res = set_resource("carbon", 300000, 3000, 15.0)
+
+airplane = make_sector("airplane")
+
+airplane_recipe = set_production_rule(
+    "airplane",
+    {
+        oil = 30,
+        iron = 120,
+        chrome = 10,
+        carbon = 20
+    },
+    "airplane_for_people",
+    15.0
+)
+"""

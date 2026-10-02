@@ -5,8 +5,7 @@ from typing import Any
 
 """
 **경고** 이 Class는 저수준API입니다.
-Lua에서는 거의 쓰지 마십시요.
-
+Lua에서는 쓰지 마십시요.
 """
 class ModelSystemDynamics:
     

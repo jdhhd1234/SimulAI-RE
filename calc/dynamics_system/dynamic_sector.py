@@ -1,4 +1,7 @@
 from BPTK_Py import Model
+from BPTK_Py import sd_functions as sd
+
+import calc.dynamics_system.dynamic_model as dynamic_model
 
 class SystemDynamicSector:
 
@@ -51,17 +54,15 @@ class SystemDynamicSector:
     def delete_resource(self, name: str):
         return self.resources.pop(name, None)
 
-    def make_recipe(
+    def set_production_rule(
         self,
         name: str,
-        input_type: str,
-        output_type: str,
+        need_resource: dict,
         yield_rate: float
     ):
         recipe = {
             "name": name,
-            "input": input_type,
-            "output": output_type,
+            "need_resource": need_resource,
             "yield_rate": yield_rate
         }
 
@@ -115,6 +116,7 @@ class SystemDynamicSector:
         for index, saved_factory in enumerate(sector["factories"]):
             if saved_factory is factory:
                 return sector["factories"].pop(index)
+            
         return None
     
 
@@ -135,11 +137,10 @@ class SystemDynamicSector:
         factory.update(settings)
         return factory
 
-    def sector_supply_chain(
+    def connect_supply_chain(
         self,
-        input_mass: float,
-        yield_rate: float,
-        resource_setting: dict
+        first_connecter: dict,
+        end_connect: str
     ):
         """
         2026/09/30: A라는 sector가 어떤걸 Input받고(자원 kg기준)
@@ -148,19 +149,59 @@ class SystemDynamicSector:
         지금은 하나의 재료를 투입해서 하나가 나오는거지만
         점진적으로 여러개를 투입해서 하나가 나오는식으로 진화 해야함.
         """
-        available = max(0, min(
-            input_mass,
-            resource_setting["reserve"],
-            resource_setting["extraction_capa"]
-        ))
+        
+        """
+        2026/10/02
+        예를들어서 항공기에 비유 하면
+        
+        [강철, 카본, 석유] -> 항공에 맞게 가공 -> airplane 섹터 -> airplane output
+        """
 
-        processed_input = (
-            available
-            * resource_setting["processing_yield"]
-        )
+        recipe = self.recipes[end_connect]
+        
+        need = recipe["need_resource"]
+        
+        sector_name = first_connecter["name"]
+        
+        capacity = 0.0
+        
+        for f in first_connecter["factories"]:
+            capacity += f["capacity"]
+            
+        # Lua Binding Support Model
+        model_ = dynamic_model.SystemDynamicsModel.create_model
 
-        output_mass = processed_input * yield_rate
+        # 투입 자원(kg)마다 stock 하나. 초기값은 set_resource의 reserve.
+        stocks = {}
+        
+        for res in need:
+            stocks[res] = model_.stock(res)
+            stocks[res].initial_value = float(self.resources.get(res, {}).get("reserve", 0))
 
-        resource_setting["reserve"] -= available
+        # 생산 속도 = 재료 중 가장 모자란 것 / 필요량, 공장 capacity 상한
+        rate = model_.converter(f"{sector_name}_rate")
+        
+        rate_eq = capacity
+        
+        for res, amount in need.items():
+            rate_eq = sd.min(rate_eq, stocks[res] / amount)
+            
+        rate.equation = rate_eq
 
-        return output_mass
+        # 재료 소모 flow -> 각 stock의 outflow
+        for res, amount in need.items():
+            use = model_.flow(f"{res}_use")
+            use.equation = rate * amount
+            
+            stocks[res].equation = -use
+
+        # 생산품 stock (yield_rate 반영)
+        output = model_.stock(f"{sector_name}_output")
+        output.initial_value = 0.0
+        
+        make = model_.flow(f"{sector_name}_make")
+        make.equation = rate * recipe["yield_rate"]
+        
+        output.equation = make
+
+        return model_
