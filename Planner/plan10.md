@@ -154,4 +154,22 @@ airplane_recipe = set_production_rule(
     "airplane_for_people",
     15.0
 )
+
+
 """
+
+# 2026/10/03
+
+오늘할것
+
+1. connect_supply_chain을 완성한다
+
+make_sector -> dict
+set_production_rule -> dict
+sector_create_factory -> dict
+sector_factory_setting -> dict
+
+여기 있는걸 엮어주는 즉 WEB를 만드는 로직이 필요함.
+
+파라미터는 dict기반으로 하고 dict를 연결해주는로직이 필요함
+bptk-py로 한다.

@@ -5,7 +5,7 @@ import lupa
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import dynamics_system.dynamic_lowlevel as dm
+import calc.dynamics_system.dynamic_lowlevel as dm
 import calc.dynamics_system.dynamic_sector as ds
 
 
@@ -16,12 +16,12 @@ class LuaBridge:
     - Sector: SystemDynamicSector의 sector API를 그대로 감싼다.
     Lua 사용법:
         local sec = api.make_sector("bio")
-        local recipe = api.make_recipe("bio_recipe", "resource", "bio_product", 0.8)
-        local fac_id = api.sector_create_factory(1200, 720, sec)
-        api.sector_factory_setting(fac_id, {recipe = recipe, capacity = 100})
-        api.make_stock("capital", function(t) return get("income", t) end, 5000.0)
-        api.make_flow("inflow", function(t) return 10 end)
-        api.make_converter("income", function(t) return get("capital", t) * 0.1 end)
+        api.set_resource("resource", 1000, 100, 1.0, 1.0)
+        local rule = api.set_production_rule("bio_rule", {resource = 1}, 0.8)
+        local fac_id = api.sector_create_factory("bio_factory", sec, 37.5, 127.0)
+        api.sector_factory_setting(fac_id, {capacity = 100})
+        api.set_sector_production_rule(sec, rule)
+        api.connect_supply_chain(sec)
     """
 
     def __init__(self, start_time, stop_time, dt, name: str):
@@ -36,13 +36,19 @@ class LuaBridge:
         self.factories = {}
         self.factory_sectors = {}
         self.factory_ids = {}
-        self.recipes = {}
+        self.production_rules = {}
         self.resources = {}
+        self.locations = []
+        self.console = []
 
         self.lua = lupa.LuaRuntime(unpack_returned_tuples=False)
         self.lua.globals()["api"] = self
         self.lua.globals()["get"] = lambda name, t: self.model.memoize(name, t)
+        self.lua.globals()["print"] = self._print
         self.set_locations([])
+
+    def _print(self, *values):
+        self.console.append("\t".join(str(value) for value in values))
 
     def _key(self, fn):
         key = f"lua_{len(self.model.lua_fn)}"
@@ -136,10 +142,19 @@ class LuaBridge:
         self.factory.make_sector(name)
         return name
 
-    def make_recipe(self, name, input_type, output_type, yield_rate):
-        recipe = self.factory.make_recipe(name, input_type, output_type, float(yield_rate))
-        self.recipes[name] = recipe
+    def set_production_rule(self, name, need_resource, yield_rate):
+        recipe = self.factory.set_production_rule(
+            name, self._to_python(need_resource), float(yield_rate)
+        )
+        self.production_rules[name] = recipe
         return name
+
+    def set_sector_production_rule(self, sector, rule):
+        sector_name, _ = self._resolve_sector(sector)
+        if rule not in self.production_rules:
+            raise ValueError(f"unknown production rule: {rule!r}")
+        self.factory.set_sector_production_rule(sector_name, rule)
+        return sector_name
 
     def set_resource(self, name, reserve, extraction_capacity, extraction_cost, processing_yield):
         resource = self.factory.set_resource(
@@ -152,48 +167,38 @@ class LuaBridge:
         self.resources[name] = resource
         return name
 
-    def sector_create_factory(self, x, y, sector):
+    def sector_create_factory(self, name, sector, latitude=0, longitude=0):
         """특정 좌표에 공장을 건설하고, 이후 설정에 사용할 핸들을 돌려준다."""
-        name, sector_dict = self._resolve_sector(sector)
-        factory = self.factory.sector_create_factory(float(x), float(y), sector_dict)
-        base_id = f"{name}_{factory['x']}_{factory['y']}"
-        factory_id = base_id
-        suffix = 2
-        while factory_id in self.factories:
-            factory_id = f"{base_id}_{suffix}"
-            suffix += 1
+        sector_name, _ = self._resolve_sector(sector)
+        factory_id = str(name)
+        if factory_id in self.factories:
+            raise ValueError(f"factory already exists: {factory_id}")
+        factory = self.factory.sector_create_factory(factory_id, sector_name)
         self.factories[factory_id] = factory
-        self.factory_sectors[factory_id] = name
+        self.factory_sectors[factory_id] = sector_name
         self.factory_ids[id(factory)] = factory_id
         self.establishments.append({
             "id": factory_id,
-            "sector": name,
-            "x": factory["x"],
-            "y": factory["y"],
-            # 구 코드(webapi/map_records)가 posx/posy를 읽으므로 호환 키도 둔다.
-            "posx": factory["x"],
-            "posy": factory["y"],
+            "sector": sector_name,
+            "latitude": float(latitude),
+            "longitude": float(longitude),
         })
         return factory_id
 
-    def sector_make_factory(self, x, y, sector):
+    def sector_make_factory(self, name, sector, latitude=0, longitude=0):
         """기존 Lua 시나리오가 사용할 수 있는 공장 생성 이름이다."""
-        return self.sector_create_factory(x, y, sector)
+        return self.sector_create_factory(name, sector, latitude, longitude)
 
     def sector_factory_setting(self, factory_ref, settings=None, **kwargs):
         factory = self._resolve_factory(factory_ref)
         if settings is not None:
             kwargs.update(self._to_python(settings))
-        self.factory.sector_factory_setting(factory, **kwargs)
+        self.factory.sector_factory_setting(factory_ref, **kwargs)
         return factory_ref
 
-    def sector_supply_chain(self, input_mass, yield_rate, resource_ref):
-        resource = self._resolve_resource(resource_ref)
-        return self.factory.sector_supply_chain(
-            float(input_mass),
-            float(yield_rate),
-            resource,
-        )
+    def connect_supply_chain(self, sector):
+        name, _ = self._resolve_sector(sector)
+        return self.factory.connect_supply_chain(name, self.model)
 
     def delete_factory(self, factory_ref):
         factory = self._resolve_factory(factory_ref)
@@ -203,7 +208,7 @@ class LuaBridge:
         if sector is None:
             raise ValueError(f"factory is not attached to a sector: {factory_ref!r}")
 
-        deleted = self.factory.sector_delete_factory(sector, factory)
+        deleted = self.factory.sector_delete_factory(sector, factory_id)
         if deleted is None:
             raise ValueError(f"factory is not attached to a sector: {factory_ref!r}")
         self.factories.pop(factory_id, None)
@@ -224,8 +229,8 @@ class LuaBridge:
         self.factory.delete_sector(name)
         return name
 
-    def delete_recipe(self, name):
-        self.recipes.pop(name, None)
+    def delete_production_rule(self, name):
+        self.production_rules.pop(name, None)
         return self.factory.delete_recipe(name) is not None
 
     def delete_resource(self, name):
@@ -251,6 +256,7 @@ class LuaBridge:
         UI에서 추가한 위치를 Lua 전역 locations 테이블(1부터 시작)로 넘긴다.
         Lua: locations[1].name, locations[1].lat, locations[1].lon
         """
+        self.locations = [dict(location) for location in locations]
         items = []
         for location in locations:
             items.append({
@@ -261,6 +267,13 @@ class LuaBridge:
             })
         self.lua.globals()["locations"] = self.lua.table_from(items, recursive=True)
 
+    def get_info_marker(self, name):
+        """WebUI에서 추가한 위치 마커를 이름으로 조회한다."""
+        for location in self.locations:
+            if location["name"] == name:
+                return location
+        raise ValueError(f"unknown location marker: {name!r}")
+
     def describe(self, factory_id, name, country=""):
         """지도에 보일 이름/국가. factory_id는 sector_create_factory가 돌려준 값."""
         self.info[factory_id] = {"name": name, "country": country}
@@ -269,13 +282,12 @@ class LuaBridge:
         """해당 sector의 공장과 연결된 레시피를 조회한다."""
         name, sector_dict = self._resolve_sector(sector)
         factories = list(sector_dict.get("factories", []))
-        recipes = []
-        for factory in factories:
-            recipe_name = factory.get("recipe")
-            recipe = self.recipes.get(recipe_name)
-            if recipe is not None and recipe not in recipes:
-                recipes.append(recipe)
-        return {"sector": name, "factories": factories, "recipes": recipes}
+        rule_name = sector_dict.get("production_rule")
+        return {
+            "sector": name,
+            "factories": factories,
+            "production_rule": self.production_rules.get(rule_name),
+        }
 
     def sector_summary(self, sector):
         """해당 sector의 공장 수와 capacity 요약을 돌려준다."""
@@ -284,8 +296,11 @@ class LuaBridge:
         return {
             "sector": name,
             "factory_count": len(factories),
-            "capacity": sum(float(factory.get("capacity", 0)) for factory in factories),
-            "locations": [[factory["x"], factory["y"]] for factory in factories],
+            "capacity": sum(float(self.factories[factory].get("capacity", 0)) for factory in factories),
+            "locations": [
+                [item["latitude"], item["longitude"]]
+                for item in self.establishments if item["sector"] == name
+            ],
         }
 
     def run_file(self, path):
@@ -322,26 +337,23 @@ class LuaBridge:
         result = self.series()
 
         records = []
-        for sector_name, sector in self.factory.sectors.items():
-            for f in sector.get("factories", []):
-                factory_id = self.factory_ids.get(
-                    id(f), f"{sector_name}_{f['x']}_{f['y']}"
-                )
-                data = []
-                for i, t in enumerate(result["time"]):
-                    row = {"time": int(t) if float(t).is_integer() else t}
-                    for name, values in result["series"].items():
-                        row[name] = values[i]
-                    data.append(row)
+        for establishment in self.establishments:
+            factory_id = establishment["id"]
+            data = []
+            for i, t in enumerate(result["time"]):
+                row = {"time": int(t) if float(t).is_integer() else t}
+                for name, values in result["series"].items():
+                    row[name] = values[i]
+                data.append(row)
 
-                info = self.info.get(factory_id, {})
-                records.append({
-                    "sector": sector_name,
-                    "latitude": f["x"],
-                    "longitude": f["y"],
-                    "name": info.get("name", factory_id),
-                    "country": info.get("country", ""),
-                    "data": data,
-                })
+            info = self.info.get(factory_id, {})
+            records.append({
+                "sector": establishment["sector"],
+                "latitude": establishment["latitude"],
+                "longitude": establishment["longitude"],
+                "name": info.get("name", factory_id),
+                "country": info.get("country", ""),
+                "data": data,
+            })
 
         return records

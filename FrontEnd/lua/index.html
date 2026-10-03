@@ -15,6 +15,7 @@
         #status.error { color: #e57373; }
         .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
         pre { background: #1a1a1a; border: 1px solid #333; padding: 12px; overflow: auto; max-height: 420px; }
+        #console { min-height: 160px; max-height: 280px; color: #9ee493; background: #090909; }
         .chart-box { position: relative; height: 420px; }
         table { border-collapse: collapse; width: 100%; }
         th, td { border: 1px solid #333; padding: 6px 10px; text-align: left; }
@@ -45,6 +46,9 @@
         </section>
     </div>
 
+    <h2>Lua Console</h2>
+    <pre id="console" aria-live="polite">실행 출력이 여기에 표시됩니다.</pre>
+
     <h2>Sector</h2>
     <table id="sector-table">
         <thead>
@@ -54,6 +58,6 @@
     </table>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="lua.js"></script>
+    <script src="lua.js?v=console-1"></script>
 </body>
 </html>

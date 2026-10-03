@@ -12,8 +12,8 @@ COLUMNS = {
     "gdp": "gdp",
     "tax_revenue": "tax_revenue",
     "hire": "hire",
-    "labor": "country_0_0_labor",
-    "production": "production",
+    "labor": "country_labor",
+    "production": "country_output",
     "sell": "sell",
 }
 

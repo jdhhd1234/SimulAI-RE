@@ -5,9 +5,18 @@
 const luaForm = document.querySelector("#lua-form");
 const luaFileSelect = document.querySelector("#lua-file");
 const luaStatus = document.querySelector("#lua-status");
+const luaConsole = document.querySelector("#lua-console");
 const locationList = document.querySelector("#location-list");
 
 let locationLayer;
+
+function renderLuaConsole(lines, error) {
+    if (!luaConsole) {
+        return;
+    }
+
+    luaConsole.textContent = [...lines, ...(error ? [`ERROR: ${error}`] : [])].join("\n") || "출력이 없습니다.";
+}
 
 async function loadLuaFiles() {
     const response = await fetch("/lua/files");
@@ -39,13 +48,20 @@ async function runLua(event) {
         const response = await fetch(`/lua/run/${encodeURIComponent(luaFileSelect.value)}?to_map=true`, { method: "POST" });
         const result = await response.json();
         if (!response.ok) {
-            throw new Error(typeof result.detail === "string" ? result.detail : JSON.stringify(result.detail));
+            const detail = result.detail || {};
+            const message = typeof detail === "string" ? detail : detail.message || JSON.stringify(detail);
+            renderLuaConsole(detail.console || [], message);
+            throw new Error(message);
         }
 
+        renderLuaConsole(result.console || []);
         luaStatus.textContent = `사업장 ${result.company_ids.length}개를 지도에 표시했습니다.`;
         // 방금 등록된 Lua 자산 중 첫 번째를 선택해 보여준다.
         await loadCompanies(result.company_ids[0], true);
     } catch (error) {
+        if (luaConsole?.textContent === "실행 출력이 여기에 표시됩니다.") {
+            renderLuaConsole([], error.message);
+        }
         luaStatus.textContent = `Failed: ${error.message}`;
     }
 }

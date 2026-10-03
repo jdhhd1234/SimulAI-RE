@@ -8,9 +8,21 @@ class SystemDynamicSector:
     def __init__(self):
         # 2026/09/30: make_sector가 만든 sector 정보를 단발성으로 흘려보내지 않고
         # factory가 살아있는 동안 계속 보관한다. (LuaBridge.recipes/info와 같은 방식)
+
+        # 어떤 sector이 있는지
         self.sectors = {}
-        self.recipes = {}
+
+        # 어떤 공장이 있는지
+        self.factories = {}
+
+        # 어떤 조합법이 있는지
+        self.production_rules = {}
+
+        # 어떤 자원이 있는지
         self.resources = {}
+
+        # 공급망 연결 상태는 어떤지
+        self.supply_chain = {}
 
     def make_sector(self, name: str):
         """
@@ -39,6 +51,9 @@ class SystemDynamicSector:
         extraction_cost: float,
         processing_yield: float
     ):
+        """
+        2026/10/03: 자원을 설정하는 함수
+        """
         set_res_data = {
             "name": name,
             "reserve": reserve,
@@ -60,24 +75,62 @@ class SystemDynamicSector:
         need_resource: dict,
         yield_rate: float
     ):
+        """
+        2026/10/03: 특정 생산품을 만들기위해 들어가는 함수
+        """
+
+        """
+        2026/10/03
+        need_resource 예시:
+        {
+            "steel": 100.0,
+            "carbon": 20.0,
+            "oil": 10.0
+        }
+        """
+
+        checked_resource = {}
+
+        for resource, amount in need_resource.items():
+
+            if resource not in self.resources:
+                raise ValueError(f"Dont Exist Resource: {resource}")
+
+            amount = float(amount)
+
+            if amount <= 0:
+                raise ValueError(
+                    f"{resource} The required amount must be greater than zero"
+                )
+
+            checked_resource[resource] = amount
+
         recipe = {
             "name": name,
-            "need_resource": need_resource,
-            "yield_rate": yield_rate
+            "need_resource": checked_resource,
+            "yield_rate": float(yield_rate)
         }
 
-        self.recipes[name] = recipe
+        self.production_rules[name] = recipe
 
         return recipe
 
     def delete_recipe(self, name: str):
-        return self.recipes.pop(name, None)
+        return self.production_rules.pop(name, None)
+
+    def set_sector_production_rule(self, sector_name: str, rule_name: str):
+        if sector_name not in self.sectors:
+            raise ValueError(f"Dont Exist Sector: {sector_name}")
+        if rule_name not in self.production_rules:
+            raise ValueError(f"Dont Exist Production Rule: {rule_name}")
+
+        self.sectors[sector_name]["production_rule"] = rule_name
+        return self.sectors[sector_name]
 
     def sector_create_factory(
         self,
-        x: float,
-        y: float,
-        sector: dict
+        factory_name: str,
+        sector: str
     ):
         """
         2026/09/27: 공장을 특정 좌표에 건설한다.
@@ -96,112 +149,124 @@ class SystemDynamicSector:
         make_sec_bio = make_sector("bio")
         make_fac_1 = sector_make_factory(1200, 720, make_sec_bio)
         """
-        
         factory = {
-            "x": x,
-            "y": y,
             "capacity": 1.0,
-            "inventory": {}
+            "sector": sector,
+            "inventory": {},
+            "settings": {}
         }
 
-        sector["factories"].append(factory)
+        self.factories[factory_name] = factory
+
+        self.sectors[sector]["factories"].append(factory_name)
 
         return factory
 
     def sector_delete_factory(
         self,
         sector: dict,
-        factory: dict
+        factory_name: str
     ):
-        for index, saved_factory in enumerate(sector["factories"]):
-            if saved_factory is factory:
-                return sector["factories"].pop(index)
-            
+        if factory_name in sector["factories"]:
+            sector["factories"].remove(factory_name)
+            return self.factories.pop(factory_name, None)
+
         return None
-    
 
     def sector_factory_setting(
         self,
-        factory: dict,
+        factory_name: str,
         **settings
     ):
-        """
-        2026/09/30
-        이미 sector_make_factory를 통해 만들어진 공장에서 추가적인 부가적인 세팅을 하는것.
-        
-        해야할것
-        1. sector_make_factory에 관한 정보를 받아와야함.
-        2. 추가 정보를 더 붙힘
-        """
-        
+        factory = self.factories.get(factory_name)
+
+        if factory is None:
+            return None
+
         factory.update(settings)
+
         return factory
 
-    def connect_supply_chain(
-        self,
-        first_connecter: dict,
-        end_connect: str
-    ):
-        """
-        2026/09/30: A라는 sector가 어떤걸 Input받고(자원 kg기준)
-        어떤걸 Output(생산품 하나기준 int하는지
+    def connect_supply_chain(self, sector_name: str, model: Model):
 
-        지금은 하나의 재료를 투입해서 하나가 나오는거지만
-        점진적으로 여러개를 투입해서 하나가 나오는식으로 진화 해야함.
         """
-        
-        """
-        2026/10/02
-        예를들어서 항공기에 비유 하면
-        
-        [강철, 카본, 석유] -> 항공에 맞게 가공 -> airplane 섹터 -> airplane output
+        2026/10/03
+
+        이 함수는 기존에 있는 그냥 속과 알맹이만 있는 특징에 자동으로 flow를 붙치는 역할을 한다.
         """
 
-        recipe = self.recipes[end_connect]
+        """
+        # Plan
         
-        need = recipe["need_resource"]
-        
-        sector_name = first_connecter["name"]
-        
+        1. 여기있는 정보를 다 읽기
+        make_sector -> dict
+        set_production_rule -> dict
+        sector_create_factory -> dict
+
+        2. 읽은 다음에 그걸 BPTK-Py로 변환시킨다
+        """
+
+        sector = self.sectors[sector_name]
+
+        rule = self.production_rules[
+            sector["production_rule"]
+        ]
+
+        factories = [
+            self.factories[name]
+            for name in sector["factories"]
+        ]
+
         capacity = 0.0
-        
-        for f in first_connecter["factories"]:
-            capacity += f["capacity"]
-            
-        # Lua Binding Support Model
-        model_ = dynamic_model.SystemDynamicsModel.create_model
 
-        # 투입 자원(kg)마다 stock 하나. 초기값은 set_resource의 reserve.
-        stocks = {}
-        
-        for res in need:
-            stocks[res] = model_.stock(res)
-            stocks[res].initial_value = float(self.resources.get(res, {}).get("reserve", 0))
+        for factory in factories:
+            capacity += factory["capacity"]
 
-        # 생산 속도 = 재료 중 가장 모자란 것 / 필요량, 공장 capacity 상한
-        rate = model_.converter(f"{sector_name}_rate")
-        
-        rate_eq = capacity
-        
-        for res, amount in need.items():
-            rate_eq = sd.min(rate_eq, stocks[res] / amount)
-            
-        rate.equation = rate_eq
+        if capacity <= 0:
+            raise ValueError(f"{sector_name} has no production capacity")
 
-        # 재료 소모 flow -> 각 stock의 outflow
-        for res, amount in need.items():
-            use = model_.flow(f"{res}_use")
-            use.equation = rate * amount
-            
-            stocks[res].equation = -use
+        functions = getattr(model, "sector_fn", None)
+        if functions is None:
+            functions = {}
+            model.sector_fn = functions
 
-        # 생산품 stock (yield_rate 반영)
-        output = model_.stock(f"{sector_name}_output")
-        output.initial_value = 0.0
-        
-        make = model_.flow(f"{sector_name}_make")
-        make.equation = rate * recipe["yield_rate"]
-        
-        output.equation = make
+        production_name = f"{sector_name}_production"
+        output_name = f"{sector_name}_output"
+        stock_names = {}
 
-        return model_
+        for resource, amount in rule["need_resource"].items():
+            resource_data = self.resources[resource]
+            stock_name = f"{sector_name}_{resource}_reserve"
+            stock_names[resource] = stock_name
+            model.stock(stock_name).initial_value = float(resource_data["reserve"])
+
+        def production_rate(t):
+            available_capacity = capacity
+            for resource, amount in rule["need_resource"].items():
+                resource_data = self.resources[resource]
+                reserve = max(0.0, model.memoize(stock_names[resource], t))
+                available_capacity = min(
+                    available_capacity,
+                    resource_data["extraction_capa"] / amount,
+                    reserve / amount,
+                )
+            return available_capacity * rule["yield_rate"]
+
+        functions[production_name] = production_rate
+        production_flow = model.flow(production_name)
+        production_flow.equation = f"model.sector_fn['{production_name}'](t)"
+        model.stock(output_name).equation = production_flow
+
+        for resource, amount in rule["need_resource"].items():
+            consumption_name = f"{sector_name}_{resource}_consumption"
+            functions[consumption_name] = lambda t, amount=amount: -production_rate(t) * amount
+            consumption_flow = model.flow(consumption_name)
+            consumption_flow.equation = f"model.sector_fn['{consumption_name}'](t)"
+            model.stock(stock_names[resource]).equation = consumption_flow
+
+        return {
+            "sector": sector_name,
+            "production": production_name,
+            "output": output_name,
+            "resources": stock_names,
+        }

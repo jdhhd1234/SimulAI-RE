@@ -294,6 +294,7 @@ def run_lua(
     to_map: bool = False,
 ):
     path = _lua_path(name)
+    bridge = None
 
     try:
         bridge = LuaBridge(start, stop, dt, "web_lua_economy")
@@ -304,7 +305,10 @@ def run_lua(
         result = bridge.series()
         records = bridge.map_records() if to_map else []
     except (lupa.LuaError, Exception) as error:
-        raise HTTPException(status_code=400, detail=f"{type(error).__name__}: {error}")
+        raise HTTPException(status_code=400, detail={
+            "message": f"{type(error).__name__}: {error}",
+            "console": bridge.console if bridge is not None else [],
+        })
 
     # to_map: Lua 사업장을 지도의 자산(companies)으로 등록한다. 다시 실행하면 이전 Lua 자산을 교체한다.
     company_ids = []
@@ -324,6 +328,7 @@ def run_lua(
         })
 
     result["sectors"] = sectors
+    result["console"] = bridge.console
     return result
 
 

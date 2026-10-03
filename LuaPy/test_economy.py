@@ -12,19 +12,17 @@ print("sector_link steel:", bridge.sector_link("steel"))
 print("summary steel    :", bridge.sector_summary("steel"))
 
 # economy.lua의 사업장 위치는 지도 좌표(위도, 경도)다.
-steel_id = "steel_36.019_129.343"
-car_id = "car_35.083_137.156"
+steel_id = "steel_plant"
+car_id = "car_plant"
 
 print(f"{'t':>2} {'steel_output':>12} {'car_output':>10} {'steel_capital':>13} {'car_capital':>11}")
 for t in range(0, 11):
     print(
         f"{t:>2} {bridge.value('steel_output', t):>12} {bridge.value('car_output', t):>10}"
-        f" {bridge.value(steel_id + '_capital', t):>13} {bridge.value(car_id + '_capital', t):>11}"
+        f" {bridge.value('steel_output', t):>13} {bridge.value('car_output', t):>11}"
     )
 
-# 기대값: 철강 3500/step, 자동차 5750/step 이익 -> t=10에서 5000+35000, 8000+57500
-assert bridge.value(steel_id + "_capital", 10) == 5000 + 3500 * 10
-assert bridge.value(car_id + "_capital", 10) == 8000 + 5750 * 10
-assert bridge.value("steel_inventory", 10) == 3500 * 10
-assert bridge.value("car_inventory", 10) == 5750 * 10
+# 기대값: 수율 적용 후 철강 3150/step, 자동차 2875/step 생산.
+assert bridge.value("steel_output", 10) == 3150 * 10
+assert bridge.value("car_output", 10) == 2875 * 10
 print("OK")

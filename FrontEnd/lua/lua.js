@@ -1,6 +1,7 @@
 const fileSelect = document.querySelector("#lua-file");
 const sourceEl = document.querySelector("#source");
 const statusEl = document.querySelector("#status");
+const consoleEl = document.querySelector("#console");
 const runButton = document.querySelector("#run");
 const sectorBody = document.querySelector("#sector-table tbody");
 const chartCanvas = document.querySelector("#chart");
@@ -11,6 +12,10 @@ let chart;
 function setStatus(message, isError = false) {
     statusEl.textContent = message;
     statusEl.classList.toggle("error", isError);
+}
+
+function renderConsole(lines, error) {
+    consoleEl.textContent = [...lines, ...(error ? [`ERROR: ${error}`] : [])].join("\n") || "출력이 없습니다.";
 }
 
 async function loadSource() {
@@ -72,9 +77,9 @@ function renderSectors(sectors) {
         const row = document.createElement("tr");
         const cells = [
             sector.summary.sector,
-            sector.link.recipes
-                .map((recipe) => `${recipe.input} -> ${recipe.output} (${recipe.yield_rate})`)
-                .join(", ") || "-",
+            sector.link.production_rule
+                ? `${Object.entries(sector.link.production_rule.need_resource).map(([name, amount]) => `${name} x${amount}`).join(", ")} -> output (${sector.link.production_rule.yield_rate})`
+                : "-",
             sector.summary.factory_count,
             sector.summary.capacity,
             sector.summary.locations.map((pos) => `(${pos[0]}, ${pos[1]})`).join(" ") || "-",
@@ -101,8 +106,12 @@ async function runLua() {
         const response = await fetch(`/lua/run/${encodeURIComponent(fileSelect.value)}?${params}`, { method: "POST" });
         const result = await response.json();
         if (!response.ok) {
-            throw new Error(typeof result.detail === "string" ? result.detail : JSON.stringify(result.detail));
+            const detail = result.detail || {};
+            const message = typeof detail === "string" ? detail : detail.message || JSON.stringify(detail);
+            renderConsole(detail.console || [], message);
+            throw new Error(message);
         }
+        renderConsole(result.console || []);
         renderChart(result);
         renderSectors(result.sectors);
         setStatus("완료");

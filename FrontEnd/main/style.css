@@ -23,6 +23,19 @@ h1 {
     color: #666666;
 }
 
+.lua-console {
+    min-height: 96px;
+    max-height: 220px;
+    margin: 12px 0 0;
+    padding: 10px;
+    overflow: auto;
+    border: 1px solid #2a2a2a;
+    background: #0b0b0b;
+    color: #9ee493;
+    font: 12px/1.5 monospace;
+    white-space: pre-wrap;
+}
+
 .simulation-details .chart-box {
     position: relative;
     width: 100%;
