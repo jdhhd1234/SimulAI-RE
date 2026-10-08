@@ -38,7 +38,26 @@
                 <p class="help">왼쪽 지도 도구로 새 영토를 그릴 수 있습니다. 경계 편집은 구멍 없는 단일 Polygon에서 지원하며, 변경 후 '경계 적용'을 누르세요.</p>
             </section>
             <section>
-                <p class="eyebrow">03 / SCENARIO</p><h2>지도 파일</h2>
+                <p class="eyebrow">03 / BACKGROUND</p><h2>배경 지도 교체</h2>
+                <label class="file-button">세계지도 이미지 업로드<input id="background-upload" type="file" accept="image/png,image/jpeg,image/webp" disabled></label>
+                <form id="background-form">
+                    <label>배경 종류<select id="background-type" disabled><option value="osm">기본 세계지도</option><option value="image">업로드한 이미지</option><option value="none">배경 없음</option></select></label>
+                    <div class="buttons">
+                        <label>남쪽 위도<input id="background-south" type="number" min="-85" max="85" step="any" value="-85" required disabled></label>
+                        <label>북쪽 위도<input id="background-north" type="number" min="-85" max="85" step="any" value="85" required disabled></label>
+                    </div>
+                    <div class="buttons">
+                        <label>서쪽 경도<input id="background-west" type="number" min="-180" max="180" step="any" value="-180" required disabled></label>
+                        <label>동쪽 경도<input id="background-east" type="number" min="-180" max="180" step="any" value="180" required disabled></label>
+                    </div>
+                    <label>이미지 불투명도<input id="background-opacity" type="range" min="0" max="1" step="0.05" value="1" disabled></label>
+                    <label class="checkbox-row"><input id="territories-visible" type="checkbox" checked disabled>영토 경계 표시</label>
+                    <button id="background-apply" disabled>배경 설정 적용</button>
+                </form>
+                <p class="help">PNG·JPG·WebP(최대 10MB)를 사용할 수 있습니다. 이미지는 지정한 범위에 맞춰 펼쳐지며, 투영법이 다르면 실제 국가 경계와 어긋날 수 있습니다. 국가·영토 데이터는 유지됩니다. 큰 이미지는 브라우저 저장 용량을 초과할 수 있으니 JSON으로 내보내세요.</p>
+            </section>
+            <section>
+                <p class="eyebrow">04 / SCENARIO</p><h2>지도 파일</h2>
                 <label class="file-button">설정 JSON 불러오기<input id="import" type="file" accept=".json,application/json" disabled></label>
                 <label class="file-button">지도 GeoJSON 교체<input id="map-import" type="file" accept=".json,.geojson,application/json,application/geo+json" disabled></label>
                 <button id="reset" class="danger" disabled>기본 지도로 초기화</button>

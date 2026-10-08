@@ -6,10 +6,8 @@ let countryLayer;
 let borderLayer = null;
 let drawing = false;
 let dirty = false;
+let backgroundLayer;
 const map = L.map('editor-map').setView([25, 15], 2);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors', maxZoom: 18,
-}).addTo(map);
 const drawControl = new L.Control.Draw({
     draw: { polygon: { allowIntersection: false, shapeOptions: { color: '#c4d78b' } },
         polyline: false, rectangle: false, circle: false, marker: false, circlemarker: false },
@@ -20,10 +18,58 @@ function status(message) {
     ui['editor-status'].textContent = message;
 }
 
+function renderBackground() {
+    if (backgroundLayer) map.removeLayer(backgroundLayer);
+    backgroundLayer = null;
+    const background = scenario.background || { type: 'osm' };
+    if (background.type === 'osm') {
+        backgroundLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors', maxZoom: 18,
+        }).addTo(map);
+    } else if (background.type === 'image') {
+        backgroundLayer = L.imageOverlay(background.image, background.bounds, {
+            pane: 'tilePane', opacity: background.opacity ?? 1, interactive: false,
+        }).addTo(map);
+        backgroundLayer.on('error', () => status('배경 이미지를 표시하지 못했습니다. 다른 이미지로 교체하세요.'));
+    }
+    ui['background-type'].value = background.type;
+    const bounds = background.bounds || [[-85, -180], [85, 180]];
+    ui['background-south'].value = bounds[0][0];
+    ui['background-west'].value = bounds[0][1];
+    ui['background-north'].value = bounds[1][0];
+    ui['background-east'].value = bounds[1][1];
+    ui['background-opacity'].value = background.opacity ?? 1;
+    ui['territories-visible'].checked = background.showTerritories !== false;
+}
+
 function validateScenario(value) {
     if (!value || value.version !== 1 || !Array.isArray(value.nations) ||
         value.map?.type !== 'FeatureCollection' || !Array.isArray(value.map.features)) {
         throw new Error('올바른 에디터 설정 JSON 또는 GeoJSON이 아닙니다.');
+    }
+    if (value.background !== undefined) {
+        const background = value.background;
+        if (!background || !['osm', 'image', 'none'].includes(background.type) ||
+            (background.showTerritories !== undefined && typeof background.showTerritories !== 'boolean') ||
+            (background.opacity !== undefined && (!Number.isFinite(background.opacity) || background.opacity < 0 || background.opacity > 1))) {
+            throw new Error('배경 종류 또는 불투명도 설정이 올바르지 않습니다.');
+        }
+        if (background.image !== undefined && (typeof background.image !== 'string' ||
+            background.image.length > 14 * 1024 * 1024 || !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(background.image))) {
+            throw new Error('배경 이미지는 최대 10MB의 PNG·JPG·WebP여야 합니다.');
+        }
+        if (background.type === 'image' && (!background.image || !background.bounds)) {
+            throw new Error('먼저 배경 이미지를 업로드하세요.');
+        }
+        if (background.bounds !== undefined) {
+            const bounds = background.bounds;
+            if (!Array.isArray(bounds) || bounds.length !== 2 || bounds.some(point =>
+                !Array.isArray(point) || point.length !== 2 || !Number.isFinite(point[0]) ||
+                !Number.isFinite(point[1]) || Math.abs(point[0]) > 85 || Math.abs(point[1]) > 180) ||
+                bounds[0][0] >= bounds[1][0] || bounds[0][1] >= bounds[1][1]) {
+                throw new Error('이미지 범위는 남쪽 < 북쪽, 서쪽 < 동쪽이어야 합니다.');
+            }
+        }
     }
     const nationIds = new Set();
     for (const nation of value.nations) {
@@ -123,8 +169,9 @@ function render() {
                 render();
             });
         },
-    }).addTo(map);
-    const feature = selectedFeature();
+    });
+    if (scenario.background?.showTerritories !== false) countryLayer.addTo(map);
+    const feature = scenario.background?.showTerritories !== false ? selectedFeature() : null;
     const owner = scenario.nations.find(item => item.id === feature?.properties.nationId);
     ui.selection.textContent = feature ? `${feature.properties.name} / ${owner?.name || '미배정'}` : '지도에서 영토를 선택하세요.';
     ui['territory-name'].value = feature?.properties.name || '';
@@ -140,6 +187,49 @@ function changed(message) {
     render();
     status(`${message} 저장 버튼으로 변경사항을 보관하세요.`);
 }
+
+ui['background-upload'].addEventListener('change', async event => {
+    const file = event.target.files[0];
+    if (!file) return;
+    event.target.disabled = true;
+    try {
+        if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) {
+            throw new Error('10MB 이하의 PNG·JPG·WebP 이미지를 선택하세요.');
+        }
+        const image = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(new Error('이미지 파일을 읽지 못했습니다.'));
+            reader.readAsDataURL(file);
+        });
+        const preview = new Image();
+        preview.src = image;
+        await preview.decode();
+        if (finishBorder() === false) return;
+        scenario.background = { ...scenario.background, type: 'image', image,
+            bounds: scenario.background?.bounds || [[-85, -180], [85, 180]],
+            opacity: scenario.background?.opacity ?? 1 };
+        renderBackground();
+        changed('배경 이미지를 교체했습니다.');
+        map.fitBounds(scenario.background.bounds);
+    } catch (error) { status(`이미지 업로드 실패: ${error.message}`); }
+    finally { event.target.value = ''; event.target.disabled = false; }
+});
+ui['background-form'].addEventListener('submit', event => {
+    event.preventDefault();
+    try {
+        const background = { ...scenario.background, type: ui['background-type'].value,
+            bounds: [[Number(ui['background-south'].value), Number(ui['background-west'].value)],
+                [Number(ui['background-north'].value), Number(ui['background-east'].value)]],
+            opacity: Number(ui['background-opacity'].value), showTerritories: ui['territories-visible'].checked };
+        validateScenario({ ...scenario, background });
+        if (finishBorder() === false) return;
+        scenario.background = background;
+        if (!background.showTerritories) selectedId = null;
+        renderBackground();
+        changed('배경 설정을 변경했습니다.');
+    } catch (error) { status(`배경 설정 실패: ${error.message}`); }
+});
 
 ui.nation.addEventListener('change', () => { if (finishBorder() !== false) render(); });
 ui['nation-add'].addEventListener('click', () => {
@@ -231,7 +321,7 @@ ui.export.addEventListener('click', () => {
     link.download = 'simulai-world.json';
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    status('국가 설정과 지도 경계를 JSON으로 내보냈습니다.');
+    status('국가 설정, 지도 경계와 배경 이미지를 JSON으로 내보냈습니다.');
 });
 for (const id of ['import', 'map-import']) ui[id].addEventListener('change', async event => {
     const file = event.target.files[0];
@@ -244,6 +334,7 @@ for (const id of ['import', 'map-import']) ui[id].addEventListener('change', asy
         borderLayer = null;
         scenario = next;
         selectedId = null;
+        renderBackground();
         changed('파일을 불러왔습니다.');
         if (countryLayer.getBounds().isValid()) map.fitBounds(countryLayer.getBounds());
     } catch (error) { status(`불러오기 실패: ${error.message}`); }
@@ -259,6 +350,7 @@ ui.reset.addEventListener('click', async () => {
         borderLayer = null;
         scenario = next;
         selectedId = null;
+        renderBackground();
         changed('기본 지도로 초기화했습니다.');
         map.setView([25, 15], 2);
     } catch (error) { status(`초기화 실패: ${error.message}`); }
@@ -281,8 +373,11 @@ async function initialize() {
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             scenario = fromGeoJSON(await response.json());
         }
-        for (const id of ['save', 'export', 'nation', 'nation-name', 'nation-color', 'nation-add', 'import', 'map-import', 'reset']) ui[id].disabled = false;
+        for (const id of ['save', 'export', 'nation', 'nation-name', 'nation-color', 'nation-add', 'import', 'map-import', 'reset',
+            'background-upload', 'background-type', 'background-south', 'background-north', 'background-west', 'background-east',
+            'background-opacity', 'territories-visible', 'background-apply']) ui[id].disabled = false;
         map.addControl(drawControl);
+        renderBackground();
         render();
         status(warning + (saved ? '저장된 지도 설정을 불러왔습니다.' : '국가를 생성하거나 지도에서 영토를 선택하세요.'));
     } catch (error) { status(`지도를 불러오지 못했습니다: ${error.message}. 서버 연결을 확인하고 새로고침하세요.`); }
