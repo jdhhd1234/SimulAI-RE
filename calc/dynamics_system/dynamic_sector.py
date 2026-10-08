@@ -225,44 +225,42 @@ class SystemDynamicSector:
         if capacity <= 0:
             raise ValueError(f"{sector_name} has no production capacity")
 
-        functions = getattr(model, "sector_fn", None)
-        if functions is None:
-            functions = {}
-            model.sector_fn = functions
-
         production_name = f"{sector_name}_production"
         output_name = f"{sector_name}_output"
         stock_names = {}
 
+        production = model.flow(production_name)
+        available = capacity
+
         for resource, amount in rule["need_resource"].items():
-            resource_data = self.resources[resource]
+            data = self.resources[resource]
             stock_name = f"{sector_name}_{resource}_reserve"
             stock_names[resource] = stock_name
-            model.stock(stock_name).initial_value = float(resource_data["reserve"])
 
-        def production_rate(t):
-            available_capacity = capacity
-            for resource, amount in rule["need_resource"].items():
-                resource_data = self.resources[resource]
-                reserve = max(0.0, model.memoize(stock_names[resource], t))
-                available_capacity = min(
-                    available_capacity,
-                    resource_data["extraction_capa"] / amount,
-                    reserve / amount,
-                )
-            return available_capacity * rule["yield_rate"]
+            reserve = model.stock(stock_name)
+            reserve.initial_value = float(data["reserve"])
 
-        functions[production_name] = production_rate
-        production_flow = model.flow(production_name)
-        production_flow.equation = f"model.sector_fn['{production_name}'](t)"
-        model.stock(output_name).equation = production_flow
+            available = sd.min(
+                available,
+                data["extraction_capa"] / amount
+            )
+            available = sd.min(
+                available,
+                reserve / (amount * model.dt)
+            )
 
-        for resource, amount in rule["need_resource"].items():
-            consumption_name = f"{sector_name}_{resource}_consumption"
-            functions[consumption_name] = lambda t, amount=amount: -production_rate(t) * amount
-            consumption_flow = model.flow(consumption_name)
-            consumption_flow.equation = f"model.sector_fn['{consumption_name}'](t)"
-            model.stock(stock_names[resource]).equation = consumption_flow
+            consumption = model.flow(
+                f"{sector_name}_{resource}_consumption"
+            )
+
+            consumption.equation = production / rule["yield_rate"] * amount
+            reserve.equation = -consumption
+
+        production.equation = available * rule["yield_rate"]
+
+        output = model.stock(output_name)
+        output.initial_value = 0.0
+        output.equation = production
 
         return {
             "sector": sector_name,

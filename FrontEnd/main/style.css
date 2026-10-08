@@ -23,6 +23,27 @@ h1 {
     color: #666666;
 }
 
+.editor-button {
+    display: inline-block;
+    padding: 10px 16px;
+    border: 1px solid #4c6142;
+    border-radius: 2px;
+    background: #283722;
+    color: #d9e5d2;
+    font-size: 14px;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.editor-button:hover {
+    background: #3a4c32;
+}
+
+.editor-button:focus-visible {
+    outline: 2px solid #c4d78b;
+    outline-offset: 3px;
+}
+
 .lua-console {
     min-height: 96px;
     max-height: 220px;
