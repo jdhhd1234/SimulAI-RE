@@ -1,373 +1,132 @@
-const mapElement = document.querySelector("#world-map");
-const companyForm = document.querySelector("#company-form");
-const companyList = document.querySelector("#company-list");
-const formStatus = document.querySelector("#company-form-status");
-const status = document.querySelector("#status");
+// 지도(OpenLayers) 로직. main.js와는 아래 함수와 document 이벤트로만 주고받는다.
+//   geoSetCompanies(companies), geoSetLocations(locations), geoSetTerritories(territories),
+//   geoSetSelected(id), geoPanTo(latitude, longitude)
+//   이벤트: "geo-company-click" {id}, "geo-map-click" {latitude, longitude}
+let geoTerritories = {};
+let geoSelectedId = null;
 
-let map;
-let markerLayer;
-let countryLayer;
-let coordinateMarker;
-let knownCompanyIds = new Set();
-let countriesLoaded = false;
-let territoryOwners = {};
-
-const COUNTRY_ALIASES = {
-    "United States": "United States of America",
-    "USA": "United States of America",
-    "UK": "United Kingdom",
-    "Korea": "South Korea",
-};
-
-function escapeHtml(value) {
-    return String(value ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-}
-
-function formatValue(value) {
-    if (typeof value !== "number") {
-        return "--";
-    }
-
-    return value.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
-}
-
-function updateOverview(point) {
-    const metricGrid = document.querySelector(".metric-grid");
-    if (metricGrid) {
-        metricGrid.innerHTML = Object.entries(point)
-            .filter(([key, value]) => key !== "time" && typeof value === "number")
-            .map(([key, value]) => `
-                <article class="metric-card">
-                    <span>${escapeHtml(key)}</span>
-                    <strong>${formatValue(value)}</strong>
-                </article>
-            `).join("");
-    }
-
-    const action = document.querySelector("#metric-action");
-    if (action) {
-        action.textContent = point.ai_action || "--";
-    }
-}
-
-function createPopup(company) {
-    const point = company.latest || {};
-
-    return `
-        <div class="map-popup">
-            <h3>${escapeHtml(company.name)}</h3>
-            <p>${escapeHtml(company.country)}</p>
-            ${Object.entries(point)
-                .filter(([key, value]) => key !== "time" && typeof value === "number")
-                .slice(0, 3)
-                .map(([key, value]) => `<p>${escapeHtml(key)}: ${formatValue(value)}</p>`)
-                .join("")}
-        </div>
-    `;
-}
-
-function normalizeCountry(name) {
-    const key = String(name ?? "").trim();
-    return COUNTRY_ALIASES[key] || key;
-}
+const map = new ol.Map({
+  target: 'map',
+  layers: [
+    new ol.layer.TileLayer({
+      source: new ol.source.OSM(),
+    }),
+  ],
+  view: new ol.View({
+    center: [0, 0],
+    zoom: 2,
+  }),
+});
 
 function countryStyle(feature) {
-    const owner = territoryOwners[normalizeCountry(feature.properties.name)];
-    if (!owner) {
-        return {
-            color: "#3a3a3a",
-            weight: 1,
-            fillColor: "#2a2a2a",
-            fillOpacity: 0.25,
-        };
-    }
-
-    return {
-        color: "#ffffff",
-        weight: 1,
-        fillColor: owner.color,
-        fillOpacity: 0.75,
-    };
-}
-
-function bindCountryTooltip(feature, layer) {
-    layer.bindTooltip(() => {
-        const owner = territoryOwners[normalizeCountry(feature.properties.name)];
-        return `
-            <div class="map-popup">
-                <h3>${escapeHtml(feature.properties.name)}</h3>
-                <p>${escapeHtml(owner ? owner.company_name : "미점령")}</p>
-            </div>
-        `;
-    }, {
-        sticky: true,
-        className: "company-tooltip",
+    const owner = geoTerritories[feature.get("name")];
+    const selected = owner && owner.company_id === geoSelectedId;
+    return new ol.style.Style({
+        stroke: new ol.style.Stroke({ color: "#333333", width: 0.6 }),
+        fill: new ol.style.Fill({ color: selected ? "#8c8c8c" : owner ? "#3d3d3d" : "#141414" }),
     });
 }
 
-async function loadTerritories() {
-    try {
-        const response = await fetch("/territories");
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const territories = await response.json();
-        territoryOwners = {};
-        territories.forEach((territory) => {
-            territoryOwners[normalizeCountry(territory.country)] = territory;
-        });
-        countryLayer?.setStyle(countryStyle);
-    } catch (error) {
-        console.error("Failed to load territories:", error);
-    }
-}
-
-async function loadCountries() {
-    if (!map || countriesLoaded) {
-        return;
-    }
-    countriesLoaded = true;
-
-    try {
-        const response = await fetch("/geomap/countries.geojson");
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
-        countryLayer = L.geoJSON(data, {
-            style: countryStyle,
-            onEachFeature: bindCountryTooltip,
-        }).addTo(map);
-        countryLayer.bringToBack();
-        await loadTerritories();
-    } catch (error) {
-        console.error("Failed to load country borders:", error);
-    }
-}
-
-function createMap() {
-    if (!mapElement || typeof L === "undefined" || map) {
-        return;
-    }
-
-    map = L.map(mapElement, { worldCopyJump: true }).setView([24, 10], 2);
-    markerLayer = L.layerGroup().addTo(map);
-
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "&copy; OpenStreetMap contributors",
-        maxZoom: 18,
-    }).addTo(map);
-
-    loadCountries();
-
-    map.invalidateSize();
-
-    map.on("click", (event) => {
-        const latitudeInput = companyForm?.elements.latitude;
-        const longitudeInput = companyForm?.elements.longitude;
-
-        if (!latitudeInput || !longitudeInput) {
-            return;
-        }
-
-        latitudeInput.value = event.latlng.lat.toFixed(4);
-        longitudeInput.value = event.latlng.lng.toFixed(4);
-        formStatus.textContent = "좌표 선택됨";
-
-        if (coordinateMarker) {
-            coordinateMarker.remove();
-        }
-
-        coordinateMarker = L.circleMarker(event.latlng, {
-            radius: 7,
-            color: "#ffffff",
-            weight: 2,
-            fillColor: "#888888",
-            fillOpacity: 0.95,
-        })
-            .bindTooltip("선택된 위치")
-            .addTo(map);
+function companyStyle(feature) {
+    const active = feature.get("company").id === geoSelectedId;
+    return new ol.style.Style({
+        image: new ol.style.Circle({
+            radius: active ? 7 : 4,
+            stroke: new ol.style.Stroke({ color: "#ffffff", width: 1 }),
+            fill: new ol.style.Fill({ color: active ? "#ffffff" : "#000000" }),
+        }),
     });
 }
 
-function renderCompanies(companies) {
-    createMap();
-
-    if (!markerLayer) {
-        return;
-    }
-
-    markerLayer.clearLayers();
-    loadTerritories();
-    companies.forEach((company) => {
-        L.circleMarker([company.latitude, company.longitude], {
-            radius: 8,
-            color: "#ffffff",
-            weight: 2,
-            fillColor: "#666666",
-            fillOpacity: 0.9,
-        })
-            .bindTooltip(createPopup(company), {
-                direction: "top",
-                className: "company-tooltip",
-            })
-            .bindPopup(createPopup(company))
-            .on("click", () => loadCompanies(company.id, true))
-            .addTo(markerLayer);
-    });
-}
-
-function renderCompanyList(companies, selectedId) {
-    if (!companyList) {
-        return;
-    }
-
-    companyList.innerHTML = companies.map((company) => `
-        <div class="company-item${company.id === selectedId ? " selected" : ""}" data-id="${escapeHtml(company.id)}">
-            <strong>${escapeHtml(company.name)}</strong>
-            <span>${escapeHtml(company.country)}</span>
-            <button type="button" class="company-remove" data-id="${escapeHtml(company.id)}">삭제</button>
-        </div>
-    `).join("");
-
-    companyList.querySelectorAll(".company-item").forEach((item) => {
-        item.addEventListener("click", (event) => {
-            if (event.target.closest(".company-remove")) {
-                return;
-            }
-            loadCompanies(item.dataset.id, true);
-        });
-    });
-    companyList.querySelectorAll(".company-remove").forEach((button) => {
-        button.addEventListener("click", () => {
-            deleteCompany(button.dataset.id);
-        });
-    });
-}
-
-async function loadCompanyData(companyId, showResults) {
-    const response = await fetch(`/companies/${companyId}`);
-    if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-    }
-
-    const company = await response.json();
-    document.dispatchEvent(new CustomEvent("company-data", {
-        detail: {
-            data: company.data,
-            showResults,
-        },
-    }));
-}
-
-async function deleteCompany(companyId) {
-    try {
-        const response = await fetch(`/companies/${encodeURIComponent(companyId)}`, { method: "DELETE" });
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        await loadCompanies(undefined, false);
-        if (status) {
-            status.textContent = "자산이 삭제되었습니다.";
-        }
-    } catch (error) {
-        if (status) {
-            status.textContent = `삭제 실패: ${error.message}`;
-        }
-    }
-}
-
-async function loadCompanies(selectedId, showResults = false) {
-    try {
-        const response = await fetch("/companies");
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const companies = await response.json();
-        knownCompanyIds = new Set(companies.map((company) => company.id));
-        const selectedCompany = companies.find((company) => company.id === selectedId) || companies[0];
-        updateOverview(selectedCompany?.latest || {});
-        renderCompanyList(companies, selectedCompany?.id);
-        renderCompanies(companies);
-        if (selectedCompany) {
-            await loadCompanyData(selectedCompany.id, showResults);
-        }
-        if (status) {
-            status.textContent = "연결됨";
-        }
-    } catch (error) {
-        createMap();
-        if (status) {
-            status.textContent = `Failed to load companies: ${error.message}`;
-        }
-        console.error("Failed to load companies:", error);
-    }
-}
-
-const infoPanel = document.querySelector(".info-panel");
-if (infoPanel) {
-    infoPanel.addEventListener("resize", () => {
-        if (map) {
-            map.invalidateSize();
-        }
-    });
-}
-
-document.addEventListener("map-view-change", (event) => {
-    if (event.detail?.view !== "map" || !map) {
-        return;
-    }
-
-    requestAnimationFrame(() => map.invalidateSize());
+const locationStyle = new ol.style.Style({
+    image: new ol.style.Circle({
+        radius: 4,
+        stroke: new ol.style.Stroke({ color: "#808080", width: 1, lineDash: [2, 2] }),
+    }),
 });
 
-const AUTO_REFRESH_MS = 3000;
-let autoSyncRunning = false;
+const countrySource = new ol.source.Vector({ url: "/geomap/countries.geojson", format: new ol.format.GeoJSON() });
+const markerSource = new ol.source.Vector();
+const locationSource = new ol.source.Vector();
+const countryLayer = new ol.layer.Vector({ source: countrySource, style: countryStyle });
+const markerLayer = new ol.layer.Vector({ source: markerSource, style: companyStyle });
 
-async function syncCompanies() {
-    if (autoSyncRunning) {
+countrySource.on("featuresloaderror", () => setStatus("지도 로드 실패", true));
+
+// 마우스를 올린 대상 이름 표시
+const tooltipEl = document.createElement("div");
+tooltipEl.className = "map-tooltip";
+tooltipEl.hidden = true;
+const tooltip = new ol.Overlay({ element: tooltipEl, positioning: "center-left" });
+map.addOverlay(tooltip);
+
+map.on("pointermove", (event) => {
+    if (event.dragging) {
         return;
     }
-    autoSyncRunning = true;
-
-    try {
-        const response = await fetch("/companies");
-        if (!response.ok) {
-            return;
-        }
-
-        const companies = await response.json();
-        const currentIds = new Set(companies.map((company) => company.id));
-        const added = companies.filter((company) => !knownCompanyIds.has(company.id));
-        knownCompanyIds = currentIds;
-
-        if (!added.length) {
-            return;
-        }
-
-        const newest = companies[companies.length - 1];
-        updateOverview(newest.latest || {});
-        renderCompanyList(companies, newest.id);
-        renderCompanies(companies);
-        await loadCompanyData(newest.id, false);
-        if (status) {
-            status.textContent = `새 자산 자동 등록: ${newest.name}`;
-        }
-    } catch {
-        knownCompanyIds = new Set();
-    } finally {
-        autoSyncRunning = false;
+    const feature = map.forEachFeatureAtPixel(event.pixel, (item) => item);
+    if (!feature) {
+        tooltipEl.hidden = true;
+        return;
     }
+
+    let html;
+    if (feature.get("company")) {
+        html = feature.get("company").name;
+    } else if (feature.get("location")) {
+        html = feature.get("location").name;
+    } else {
+        const owner = geoTerritories[feature.get("name")];
+        html = owner ? `${feature.get("name")}<br>${owner.company_name}` : feature.get("name");
+    }
+    tooltipEl.innerHTML = html;
+    tooltipEl.hidden = false;
+    tooltip.setPosition(event.coordinate);
+});
+
+// 자산 마커를 누르면 선택, 그 외 지점을 누르면 좌표 전달
+map.on("singleclick", (event) => {
+    const feature = map.forEachFeatureAtPixel(event.pixel, (item) => item, {
+        layerFilter: (layer) => layer === markerLayer,
+    });
+    if (feature) {
+        document.dispatchEvent(new CustomEvent("geo-company-click", { detail: { id: feature.get("company").id } }));
+        return;
+    }
+
+    const [longitude, latitude] = ol.proj.toLonLat(event.coordinate);
+    const wrapped = ((((longitude + 180) % 360) + 360) % 360) - 180;
+    document.dispatchEvent(new CustomEvent("geo-map-click", { detail: { latitude, longitude: wrapped } }));
+});
+
+function pointFeature(latitude, longitude, properties) {
+    return new ol.Feature({
+        geometry: new ol.geom.Point(ol.proj.fromLonLat([longitude, latitude])),
+        ...properties,
+    });
 }
 
-loadCompanies(undefined, true).then(() => {
-    setInterval(syncCompanies, AUTO_REFRESH_MS);
-});
+function geoSetCompanies(companies) {
+    markerSource.clear();
+    companies.forEach((company) => markerSource.addFeature(pointFeature(company.latitude, company.longitude, { company })));
+}
+
+function geoSetLocations(locations) {
+    locationSource.clear();
+    locations.forEach((location) => locationSource.addFeature(pointFeature(location.latitude, location.longitude, { location })));
+}
+
+function geoSetTerritories(territories) {
+    geoTerritories = territories;
+    countryLayer.changed();
+}
+
+function geoSetSelected(id) {
+    geoSelectedId = id;
+    countryLayer.changed();
+    markerLayer.changed();
+}
+
+function geoPanTo(latitude, longitude) {
+    map.getView().animate({ center: ol.proj.fromLonLat([longitude, latitude]), duration: 300 });
+}

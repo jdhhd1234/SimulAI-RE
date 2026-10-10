@@ -3,61 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SimulAI-RE Lua</title>
-    <style>
-        body { background: #111; color: #ddd; font-family: sans-serif; margin: 0; padding: 16px; }
-        h1, h2 { font-weight: 500; }
-        .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-        select, input, button { background: #222; color: #ddd; border: 1px solid #444; padding: 6px 10px; }
-        input { width: 70px; }
-        button { cursor: pointer; }
-        #status { color: #888; }
-        #status.error { color: #e57373; }
-        .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
-        pre { background: #1a1a1a; border: 1px solid #333; padding: 12px; overflow: auto; max-height: 420px; }
-        #console { min-height: 160px; max-height: 280px; color: #9ee493; background: #090909; }
-        .chart-box { position: relative; height: 420px; }
-        table { border-collapse: collapse; width: 100%; }
-        th, td { border: 1px solid #333; padding: 6px 10px; text-align: left; }
-        @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } }
-    </style>
+    <title>SimulAI-RE · Lua</title>
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-    <h1>Lua 경제 시뮬레이션</h1>
-    <p>Lua 코드는 개인 컴퓨터의 LuaPy 폴더에서 작성하고, 여기서는 실행과 결과만 확인합니다.</p>
+    <header>
+        <h1>SIMULAI-RE</h1>
+        <nav>
+            <a href="/">지도</a>
+            <a class="active" href="/lua-ui/">Lua</a>
+        </nav>
+        <span id="status">로딩 중...</span>
+    </header>
 
-    <div class="controls">
-        <select id="lua-file"></select>
-        <label>시작 <input id="start" type="number" value="0"></label>
-        <label>종료 <input id="stop" type="number" value="10" max="200"></label>
-        <label>dt <input id="dt" type="number" value="1" min="0.1" step="any"></label>
-        <button id="run" type="button">실행</button>
-        <span id="status"></span>
+    <div class="layout lua-layout">
+        <aside>
+            <div class="block">
+                <h2>실행</h2>
+                <label>파일 <select id="lua-file"></select></label>
+                <div class="row3">
+                    <label>start <input id="start" type="number" value="0" step="any"></label>
+                    <label>stop <input id="stop" type="number" value="10" max="200" step="any"></label>
+                    <label>dt <input id="dt" type="number" value="1" min="0.0001" step="any"></label>
+                </div>
+                <label class="check"><input id="to-map" type="checkbox"> 지도 자산으로 등록</label>
+                <button id="run" type="button">실행</button>
+            </div>
+            <div class="block">
+                <h2>콘솔</h2>
+                <pre id="console">실행 전</pre>
+            </div>
+        </aside>
+
+        <section class="lua-main">
+            <div class="block">
+                <h2>결과</h2>
+                <div class="chart"><canvas id="chart"></canvas></div>
+            </div>
+            <div class="block">
+                <h2>섹터</h2>
+                <div class="table-wrap">
+                    <table id="sector-table">
+                        <thead><tr><th>섹터</th><th>생산 규칙</th><th>공장 수</th><th>capacity</th><th>위치</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="block">
+                <h2>소스</h2>
+                <pre id="source"></pre>
+            </div>
+        </section>
     </div>
 
-    <div class="layout">
-        <section>
-            <h2>Lua 코드 (읽기 전용)</h2>
-            <pre id="source"></pre>
-        </section>
-        <section>
-            <h2>시간별 결과</h2>
-            <div class="chart-box"><canvas id="chart"></canvas></div>
-        </section>
-    </div>
-
-    <h2>Lua Console</h2>
-    <pre id="console" aria-live="polite">실행 출력이 여기에 표시됩니다.</pre>
-
-    <h2>Sector</h2>
-    <table id="sector-table">
-        <thead>
-            <tr><th>sector</th><th>input -> output (yield)</th><th>사업장 수</th><th>capacity</th><th>위치</th></tr>
-        </thead>
-        <tbody></tbody>
-    </table>
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="lua.js?v=console-1"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="/common.js"></script>
+    <script src="lua.js"></script>
 </body>
 </html>
