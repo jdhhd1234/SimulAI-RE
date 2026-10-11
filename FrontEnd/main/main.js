@@ -46,7 +46,7 @@ async function refresh() {
         if (changed) {
             renderCompanies();
         }
-        // geoSetTerritories(territories);
+        geoSetTerritories(territories);
         setStatus(`연결됨 · 자산 ${companies.length}개`);
     } catch (error) {
         setStatus(`연결 실패: ${error.message}`, true);

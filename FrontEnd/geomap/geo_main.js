@@ -2,131 +2,122 @@
 //   geoSetCompanies(companies), geoSetLocations(locations), geoSetTerritories(territories),
 //   geoSetSelected(id), geoPanTo(latitude, longitude)
 //   이벤트: "geo-company-click" {id}, "geo-map-click" {latitude, longitude}
+import * as maplibregl from 'https://unpkg.com/maplibre-gl@6.13.0/dist/maplibre-gl.mjs';
+
+const getlatitude = document.querySelector('input[name="latitude"]');
+const getlongitude = document.querySelector('input[name="longitude"]');
+
+const map = new maplibregl.Map({
+    container: 'map', // container id
+    style: 'https://demotiles.maplibre.org/style.json', // style URL
+    center: [0, 0], // starting position [lng, lat]
+    zoom: 1, // starting zoom
+    maplibreLogo: true
+});
+
+
 let geoTerritories = {};
 let geoSelectedId = null;
+let geoCompanyMarkers = [];
+let geoLocationMarkers = [];
+const hoverPopup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 12 });
 
-const map = new ol.Map({
-  target: 'map',
-  layers: [
-    new ol.layer.TileLayer({
-      source: new ol.source.OSM(),
-    }),
-  ],
-  view: new ol.View({
-    center: [0, 0],
-    zoom: 2,
-  }),
-});
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
 
-function countryStyle(feature) {
-    const owner = geoTerritories[feature.get("name")];
-    const selected = owner && owner.company_id === geoSelectedId;
-    return new ol.style.Style({
-        stroke: new ol.style.Stroke({ color: "#333333", width: 0.6 }),
-        fill: new ol.style.Fill({ color: selected ? "#8c8c8c" : owner ? "#3d3d3d" : "#141414" }),
+// 영토 색상: 자산이 점유한 국가는 밝게, 선택된 자산의 영토는 더 밝게
+function geoCountryColor() {
+    const pairs = [];
+    Object.entries(geoTerritories).forEach(([country, owner]) => {
+        pairs.push(country, owner.company_id === geoSelectedId ? "#8c8c8c" : "#3d3d3d");
     });
+    return pairs.length ? ["match", ["get", "name"], ...pairs, "#141414"] : "#141414";
 }
 
-function companyStyle(feature) {
-    const active = feature.get("company").id === geoSelectedId;
-    return new ol.style.Style({
-        image: new ol.style.Circle({
-            radius: active ? 7 : 4,
-            stroke: new ol.style.Stroke({ color: "#ffffff", width: 1 }),
-            fill: new ol.style.Fill({ color: active ? "#ffffff" : "#000000" }),
-        }),
-    });
+function geoRefreshCountries() {
+    if (map.getLayer("countries-fill")) {
+        map.setPaintProperty("countries-fill", "fill-color", geoCountryColor());
+    }
 }
 
-const locationStyle = new ol.style.Style({
-    image: new ol.style.Circle({
-        radius: 4,
-        stroke: new ol.style.Stroke({ color: "#808080", width: 1, lineDash: [2, 2] }),
-    }),
-});
+map.on("load", () => {
+    map.addSource("countries", { type: "geojson", data: "/geomap/countries.geojson" });
+    map.addLayer({ id: "countries-fill", type: "fill", source: "countries", paint: { "fill-color": geoCountryColor() } });
+    map.addLayer({ id: "countries-line", type: "line", source: "countries", paint: { "line-color": "#333333", "line-width": 0.6 } });
 
-const countrySource = new ol.source.Vector({ url: "/geomap/countries.geojson", format: new ol.format.GeoJSON() });
-const markerSource = new ol.source.Vector();
-const locationSource = new ol.source.Vector();
-const countryLayer = new ol.layer.Vector({ source: countrySource, style: countryStyle });
-const markerLayer = new ol.layer.Vector({ source: markerSource, style: companyStyle });
-
-countrySource.on("featuresloaderror", () => setStatus("지도 로드 실패", true));
-
-// 마우스를 올린 대상 이름 표시
-const tooltipEl = document.createElement("div");
-tooltipEl.className = "map-tooltip";
-tooltipEl.hidden = true;
-const tooltip = new ol.Overlay({ element: tooltipEl, positioning: "center-left" });
-map.addOverlay(tooltip);
-
-map.on("pointermove", (event) => {
-    if (event.dragging) {
-        return;
-    }
-    const feature = map.forEachFeatureAtPixel(event.pixel, (item) => item);
-    if (!feature) {
-        tooltipEl.hidden = true;
-        return;
-    }
-
-    let html;
-    if (feature.get("company")) {
-        html = feature.get("company").name;
-    } else if (feature.get("location")) {
-        html = feature.get("location").name;
-    } else {
-        const owner = geoTerritories[feature.get("name")];
-        html = owner ? `${feature.get("name")}<br>${owner.company_name}` : feature.get("name");
-    }
-    tooltipEl.innerHTML = html;
-    tooltipEl.hidden = false;
-    tooltip.setPosition(event.coordinate);
-});
-
-// 자산 마커를 누르면 선택, 그 외 지점을 누르면 좌표 전달
-map.on("singleclick", (event) => {
-    const feature = map.forEachFeatureAtPixel(event.pixel, (item) => item, {
-        layerFilter: (layer) => layer === markerLayer,
+    // 마우스를 올린 국가 이름 표시 (점유 중이면 자산 이름 포함)
+    map.on("mousemove", "countries-fill", (event) => {
+        const name = event.features[0].properties.name;
+        const owner = geoTerritories[name];
+        hoverPopup.setLngLat(event.lngLat).setText(owner ? `${name} · ${owner.company_name}` : name).addTo(map);
     });
-    if (feature) {
-        document.dispatchEvent(new CustomEvent("geo-company-click", { detail: { id: feature.get("company").id } }));
-        return;
-    }
-
-    const [longitude, latitude] = ol.proj.toLonLat(event.coordinate);
-    const wrapped = ((((longitude + 180) % 360) + 360) % 360) - 180;
-    document.dispatchEvent(new CustomEvent("geo-map-click", { detail: { latitude, longitude: wrapped } }));
+    map.on("mouseleave", "countries-fill", () => hoverPopup.remove());
+    geoRefreshCountries();
 });
 
-function pointFeature(latitude, longitude, properties) {
-    return new ol.Feature({
-        geometry: new ol.geom.Point(ol.proj.fromLonLat([longitude, latitude])),
-        ...properties,
-    });
-}
+map.on("error", (event) => {
+    if (event.sourceId === "countries") {
+        setStatus("지도 로드 실패", true);
+    }
+});
+
+// 마커를 누르면 자산 선택(geo-company-click), 그 외 지점을 누르면 좌표 전달(geo-map-click)
+map.on("click", (event) => {
+    if (event.originalEvent.target.closest(".geo-marker")) {
+        return;
+    }
+    const { lat, lng } = event.lngLat.wrap();
+    document.dispatchEvent(new CustomEvent("geo-map-click", { detail: { latitude: lat, longitude: lng } }));
+});
 
 function geoSetCompanies(companies) {
-    markerSource.clear();
-    companies.forEach((company) => markerSource.addFeature(pointFeature(company.latitude, company.longitude, { company })));
+    geoCompanyMarkers.forEach((marker) => marker.remove());
+    geoCompanyMarkers = companies.map((company) => {
+        const el = document.createElement("div");
+        el.className = "geo-marker company-marker";
+        el.dataset.id = company.id;
+        el.title = company.name;
+        el.classList.toggle("active", company.id === geoSelectedId);
+        el.addEventListener("click", () => {
+            document.dispatchEvent(new CustomEvent("geo-company-click", { detail: { id: company.id } }));
+        });
+        return new maplibregl.Marker({ element: el }).setLngLat([company.longitude, company.latitude]).addTo(map);
+    });
 }
 
 function geoSetLocations(locations) {
-    locationSource.clear();
-    locations.forEach((location) => locationSource.addFeature(pointFeature(location.latitude, location.longitude, { location })));
+    geoLocationMarkers.forEach((marker) => marker.remove());
+    geoLocationMarkers = locations.map((location) => {
+        const el = document.createElement("div");
+        el.className = "geo-marker location-marker";
+        el.title = location.name;
+        return new maplibregl.Marker({ element: el }).setLngLat([location.longitude, location.latitude]).addTo(map);
+    });
 }
 
 function geoSetTerritories(territories) {
     geoTerritories = territories;
-    countryLayer.changed();
+    geoRefreshCountries();
 }
 
 function geoSetSelected(id) {
     geoSelectedId = id;
-    countryLayer.changed();
-    markerLayer.changed();
+    geoCompanyMarkers.forEach((marker) => {
+        const el = marker.getElement();
+        el.classList.toggle("active", el.dataset.id === geoSelectedId);
+    });
+    geoRefreshCountries();
 }
 
 function geoPanTo(latitude, longitude) {
-    map.getView().animate({ center: ol.proj.fromLonLat([longitude, latitude]), duration: 300 });
+    map.easeTo({ center: [longitude, latitude], duration: 300 });
 }
+
+// main.js(일반 모듈)에서 호출할 수 있도록 전역에 노출
+Object.assign(window, { geoSetCompanies, geoSetLocations, geoSetTerritories, geoSetSelected, geoPanTo });
+
+/** 
+ * 
+ * let marker = new Marker()
+  .setLngLat([30.5, 50.5])
+  .addTo(map);
+*/

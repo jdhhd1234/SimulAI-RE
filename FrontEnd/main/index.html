@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SimulAI-RE</title>
 
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.11.0/ol.css">
+    <link href="https://unpkg.com/maplibre-gl@6.13.0/dist/maplibre-gl.css" rel="stylesheet" />
 
     <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="/geomap/geo_style.css">
@@ -61,11 +61,9 @@
         </section>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/ol@v10.11.0/dist/ol.js"></script>
-
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <script src="../main/common.js"></script>
-    <script src="../geomap/geo_main.js"></script>
-    <script src="../main/main.js"></script>
+    <script src="common.js"></script>
+    <script type="module" src="../geomap/geo_main.js"></script>
+    <script type="module" src="main.js"></script>
 </body>
 </html>
