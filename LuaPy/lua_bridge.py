@@ -7,13 +7,18 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import calc.dynamics_system.dynamic_lowlevel as dm
 import calc.dynamics_system.dynamic_sector as ds
+import calc.dynamics_system.dynamic_index as di
+import calc.abm.abm_market as abm
 
 
 class LuaBridge:
     """
-    2026/09/30: dynamic_main.py + dynamic_sector.py 기준으로 재작성.
-    - SD: ModelSystemDynamics / SystemDynamics(stock, flow, converter)만 쓴다.
+    2026/09/30: dynamic_lowlevel.py + dynamic_sector.py 기준으로 재작성.
+    2026/10/14: dynamic_index.py(지역) + abm_market.py(소비자 ABM)도 Lua에 연결.
+    - SD: ModelSystemDynamics / SystemDynamics(stock, flow, converter)
     - Sector: SystemDynamicSector의 sector API를 그대로 감싼다.
+    - Region: SystemDynamicChara의 지역 API를 그대로 감싼다.
+    - ABM: 10% 소득계층 소비자 그룹(ConsumerAgent)
     Lua 사용법:
         local sec = api.make_sector("bio")
         api.set_resource("resource", 1000, 100, 1.0, 1.0)
@@ -22,22 +27,25 @@ class LuaBridge:
         api.sector_factory_setting(fac_id, {capacity = 100})
         api.set_sector_production_rule(sec, rule)
         api.connect_supply_chain(sec)
+
+        local seoul = api.make_region("Seoul")
+        api.set_region_resource(seoul, "resource", 500)
+        api.set_population(seoul, 10000, 0.01, 0.6)
+        api.set_infrastructure(seoul, 0.9, 0.8, 0.9, 0.95)
+        api.make_consumer_groups(api.get_region(seoul).population.total)
     """
 
     def __init__(self, start_time, stop_time, dt, name: str):
         self.model = dm.ModelSystemDynamics(start_time, stop_time, dt, name).system_dynamics_makeModel_func()
         self.model.lua_fn = {}  # BPTK equation 문자열이 model.lua_fn[key](t)로 Lua 함수를 부른다.
         self.factory = ds.SystemDynamicSector()
+        self.chara = di.SystemDynamicChara()
         self.sd = dm.SystemDynamics()
-        # 지도 API와 기존 호출부가 사용할 수 있도록 평탄 목록도 유지한다.
-        # 실제 저장소는 factory.sectors[name]["factories"]다.
+        self.consumers = []
+        self.consumer_rows = None  # ABM은 상태가 있어서 한번만 진행시키고 결과를 재사용한다.
+        # 지도 API용 공장 위치 목록. 실제 저장소는 factory.factories다.
         self.establishments = []
         self.info = {}
-        self.factories = {}
-        self.factory_sectors = {}
-        self.factory_ids = {}
-        self.production_rules = {}
-        self.resources = {}
         self.locations = []
         self.console = []
 
@@ -46,6 +54,19 @@ class LuaBridge:
         self.lua.globals()["get"] = lambda name, t: self.model.memoize(name, t)
         self.lua.globals()["print"] = self._print
         self.set_locations([])
+
+    # 저장소는 SystemDynamicSector 하나만 두고, 기존 호출부를 위해 이름만 노출한다.
+    @property
+    def factories(self):
+        return self.factory.factories
+
+    @property
+    def production_rules(self):
+        return self.factory.production_rules
+
+    @property
+    def resources(self):
+        return self.factory.resources
 
     def _print(self, *values):
         self.console.append("\t".join(str(value) for value in values))
@@ -70,36 +91,6 @@ class LuaBridge:
             )
         return 0 if eq is None else eq
 
-    def _resolve_sector(self, sector_ref):
-        """sector 인자(이름 문자열, sector dict, Lua 테이블) -> (name, sector dict)."""
-        name = None
-        if isinstance(sector_ref, str):
-            name = sector_ref
-        elif isinstance(sector_ref, dict):
-            name = sector_ref.get("name")
-        else:
-            # lupa Lua 테이블(또는 Python 객체): ["name"] / .name / .get("name") 순서로 시도
-            for accessor in (
-                lambda r: r["name"],
-                lambda r: r.name,
-                lambda r: r.get("name"),
-            ):
-                try:
-                    name = accessor(sector_ref)
-                    break
-                except Exception:
-                    continue
-            if name is None:
-                # make_sector가 이름 문자열을 돌려주므로, 테이블이 곧 이름인 경우
-                try:
-                    name = str(sector_ref)
-                except Exception:
-                    name = None
-        sector = self.factory.sectors.get(name) if name is not None else None
-        if sector is None:
-            raise ValueError(f"unknown sector: {sector_ref!r} (먼저 api.make_sector(name)을 호출하세요)")
-        return name, sector
-
     @staticmethod
     def _to_python(value):
         if lupa.lua_type(value) == "table":
@@ -107,35 +98,23 @@ class LuaBridge:
                 LuaBridge._to_python(key): LuaBridge._to_python(item)
                 for key, item in value.items()
             }
-        if isinstance(value, dict):
-            return {key: LuaBridge._to_python(item) for key, item in value.items()}
-        if isinstance(value, list):
-            return [LuaBridge._to_python(item) for item in value]
         return value
 
-    def _resolve_factory(self, factory_ref):
-        if isinstance(factory_ref, str):
-            factory = self.factories.get(factory_ref)
-        elif isinstance(factory_ref, dict):
-            factory = factory_ref
-        else:
-            factory = None
+    def _resolve_sector(self, sector_ref):
+        """sector 인자(이름 문자열 또는 name 키가 있는 dict/Lua 테이블) -> (name, sector dict)."""
+        name = sector_ref if isinstance(sector_ref, str) else sector_ref["name"]
+        sector = self.factory.sectors.get(name)
+        if sector is None:
+            raise ValueError(f"unknown sector: {sector_ref!r} (먼저 api.make_sector(name)을 호출하세요)")
+        return name, sector
 
+    def _resolve_factory(self, factory_id):
+        factory = self.factories.get(factory_id)
         if factory is None:
-            raise ValueError(f"unknown factory: {factory_ref!r} (먼저 api.sector_create_factory를 호출하세요)")
+            raise ValueError(f"unknown factory: {factory_id!r} (먼저 api.sector_create_factory를 호출하세요)")
         return factory
 
-    def _resolve_resource(self, resource_ref):
-        if isinstance(resource_ref, str):
-            resource = self.resources.get(resource_ref)
-        elif isinstance(resource_ref, dict):
-            resource = resource_ref
-        else:
-            resource = self._to_python(resource_ref)
-
-        if resource is None:
-            raise ValueError(f"unknown resource: {resource_ref!r} (먼저 api.set_resource(name, ...)를 호출하세요)")
-        return resource
+    # ---------- Sector ----------
 
     def make_sector(self, name):
         """분류 껍데기를 만들고 factory.sectors에 보관한다. Lua 연쇄 호출용으로 이름(핸들)을 돌려준다."""
@@ -143,28 +122,22 @@ class LuaBridge:
         return name
 
     def set_production_rule(self, name, need_resource, yield_rate):
-        recipe = self.factory.set_production_rule(
-            name, self._to_python(need_resource), float(yield_rate)
-        )
-        self.production_rules[name] = recipe
+        self.factory.set_production_rule(name, self._to_python(need_resource), float(yield_rate))
         return name
 
     def set_sector_production_rule(self, sector, rule):
         sector_name, _ = self._resolve_sector(sector)
-        if rule not in self.production_rules:
-            raise ValueError(f"unknown production rule: {rule!r}")
         self.factory.set_sector_production_rule(sector_name, rule)
         return sector_name
 
     def set_resource(self, name, reserve, extraction_capacity, extraction_cost, processing_yield):
-        resource = self.factory.set_resource(
+        self.factory.set_resource(
             name,
             int(reserve),
             int(extraction_capacity),
             float(extraction_cost),
             float(processing_yield),
         )
-        self.resources[name] = resource
         return name
 
     def sector_create_factory(self, name, sector, latitude=0, longitude=0):
@@ -173,10 +146,7 @@ class LuaBridge:
         factory_id = str(name)
         if factory_id in self.factories:
             raise ValueError(f"factory already exists: {factory_id}")
-        factory = self.factory.sector_create_factory(factory_id, sector_name)
-        self.factories[factory_id] = factory
-        self.factory_sectors[factory_id] = sector_name
-        self.factory_ids[id(factory)] = factory_id
+        self.factory.sector_create_factory(factory_id, sector_name)
         self.establishments.append({
             "id": factory_id,
             "sector": sector_name,
@@ -189,31 +159,22 @@ class LuaBridge:
         """기존 Lua 시나리오가 사용할 수 있는 공장 생성 이름이다."""
         return self.sector_create_factory(name, sector, latitude, longitude)
 
-    def sector_factory_setting(self, factory_ref, settings=None, **kwargs):
-        factory = self._resolve_factory(factory_ref)
+    def sector_factory_setting(self, factory_id, settings=None, **kwargs):
+        self._resolve_factory(factory_id)
         if settings is not None:
             kwargs.update(self._to_python(settings))
-        self.factory.sector_factory_setting(factory_ref, **kwargs)
-        return factory_ref
+        self.factory.sector_factory_setting(factory_id, **kwargs)
+        return factory_id
 
     def connect_supply_chain(self, sector):
         name, _ = self._resolve_sector(sector)
         return self.factory.connect_supply_chain(name, self.model)
 
-    def delete_factory(self, factory_ref):
-        factory = self._resolve_factory(factory_ref)
-        factory_id = factory_ref if isinstance(factory_ref, str) else self.factory_ids.get(id(factory))
-        sector_name = self.factory_sectors.get(factory_id)
-        sector = self.factory.sectors.get(sector_name) if sector_name else None
-        if sector is None:
-            raise ValueError(f"factory is not attached to a sector: {factory_ref!r}")
-
-        deleted = self.factory.sector_delete_factory(sector, factory_id)
-        if deleted is None:
-            raise ValueError(f"factory is not attached to a sector: {factory_ref!r}")
-        self.factories.pop(factory_id, None)
-        self.factory_sectors.pop(factory_id, None)
-        self.factory_ids.pop(id(factory), None)
+    def delete_factory(self, factory_id):
+        factory = self._resolve_factory(factory_id)
+        sector = self.factory.sectors.get(factory["sector"])
+        if sector is None or self.factory.sector_delete_factory(sector, factory_id) is None:
+            raise ValueError(f"factory is not attached to a sector: {factory_id!r}")
         self.info.pop(factory_id, None)
         self.establishments = [item for item in self.establishments if item["id"] != factory_id]
         return factory_id
@@ -222,25 +183,85 @@ class LuaBridge:
         sector = self.factory.sectors.get(name)
         if sector is None:
             return None
-        for factory in list(sector.get("factories", [])):
-            factory_id = self.factory_ids.get(id(factory))
-            if factory_id is not None:
-                self.delete_factory(factory_id)
+        for factory_id in list(sector["factories"]):
+            self.delete_factory(factory_id)
         self.factory.delete_sector(name)
         return name
 
     def delete_production_rule(self, name):
-        self.production_rules.pop(name, None)
         return self.factory.delete_recipe(name) is not None
 
     def delete_resource(self, name):
-        self.resources.pop(name, None)
         return self.factory.delete_resource(name) is not None
 
-    def make_stock(self, name, eq=None, init_value=0.0):
-        self.sd.system_dynamics_stock_func(
-            self.model, name, self._stock_eq(eq), float(init_value)
+    # ---------- Region ----------
+
+    def make_region(self, name):
+        self.chara.make_region(name)
+        return name
+
+    def delete_region(self, name):
+        return self.chara.delete_region(name) is not None
+
+    def get_region(self, name):
+        """지역 정보를 Lua 테이블로 돌려준다. Lua: api.get_region("Seoul").population.total"""
+        region = self.chara.get_region(name)
+        if region is None:
+            return None
+        return self.lua.table_from(region, recursive=True)
+
+    def set_region_resource(self, region, resource, amount):
+        self.chara.set_region_resource(region, resource, amount, self.factory)
+        return region
+
+    def delete_region_resource(self, region, resource):
+        return self.chara.delete_region_resource(region, resource) is not None
+
+    def set_population(self, region, total, growth_rate=0.0, labor_ratio=0.0):
+        self.chara.set_population(region, int(total), float(growth_rate), float(labor_ratio))
+        return region
+
+    def set_infrastructure(self, region, power=0.0, transport=0.0, water=0.0, telecom=0.0):
+        self.chara.set_infrastructure(region, power, transport, water, telecom)
+        return region
+
+    # ---------- ABM ----------
+
+    def make_consumer_groups(self, population=10000, mean=300.0, std=100.0, groups=10):
+        """정규분포 소득 인구를 10% 계층 소비자 그룹으로 만든다. 만든 그룹 수를 돌려준다."""
+        # make_consumer_groups는 ConsumerAgent 메서드지만 self를 쓰지 않아서 클래스로 바로 부른다.
+        self.consumers = abm.ConsumerAgent.make_consumer_groups(
+            None, self.model, int(population), float(mean), float(std), int(groups)
         )
+        self.consumer_rows = None
+        return len(self.consumers)
+
+    def consumer_series(self, times):
+        """소비자 그룹을 times 순서대로 진행시키고 시간별 상태를 돌려준다."""
+        rows = []
+        for step, t in enumerate(times):
+            groups = []
+            for agent in self.consumers:
+                agent.act(t, step, 0)
+                groups.append({
+                    "decile": agent.get_property_value("decile"),
+                    "population": agent.get_property_value("population"),
+                    "state": agent.state,
+                    "income": agent.get_property_value("income"),
+                    "cash": agent.get_property_value("cash"),
+                    "consume": agent.get_property_value("consume"),
+                })
+            rows.append({
+                "time": t,
+                "groups": groups,
+                "total_consume": sum(group["consume"] for group in groups),
+            })
+        return rows
+
+    # ---------- SD ----------
+
+    def make_stock(self, name, eq=None, init_value=0.0):
+        self.sd.system_dynamics_stock_func(self.model, name, self._stock_eq(eq), float(init_value))
         return name
 
     def make_flow(self, name, eq=None):
@@ -251,20 +272,23 @@ class LuaBridge:
         self.sd.system_dynamics_converter_func(self.model, name, self._converter_eq(eq))
         return name
 
+    # ---------- UI ----------
+
     def set_locations(self, locations):
         """
         UI에서 추가한 위치를 Lua 전역 locations 테이블(1부터 시작)로 넘긴다.
         Lua: locations[1].name, locations[1].lat, locations[1].lon
         """
         self.locations = [dict(location) for location in locations]
-        items = []
-        for location in locations:
-            items.append({
+        items = [
+            {
                 "id": location["id"],
                 "name": location["name"],
                 "lat": location["latitude"],
                 "lon": location["longitude"],
-            })
+            }
+            for location in locations
+        ]
         self.lua.globals()["locations"] = self.lua.table_from(items, recursive=True)
 
     def get_info_marker(self, name):
@@ -281,18 +305,16 @@ class LuaBridge:
     def sector_link(self, sector):
         """해당 sector의 공장과 연결된 레시피를 조회한다."""
         name, sector_dict = self._resolve_sector(sector)
-        factories = list(sector_dict.get("factories", []))
-        rule_name = sector_dict.get("production_rule")
         return {
             "sector": name,
-            "factories": factories,
-            "production_rule": self.production_rules.get(rule_name),
+            "factories": list(sector_dict["factories"]),
+            "production_rule": self.production_rules.get(sector_dict.get("production_rule")),
         }
 
     def sector_summary(self, sector):
         """해당 sector의 공장 수와 capacity 요약을 돌려준다."""
         name, sector_dict = self._resolve_sector(sector)
-        factories = list(sector_dict.get("factories", []))
+        factories = sector_dict["factories"]
         return {
             "sector": name,
             "factory_count": len(factories),
@@ -303,6 +325,8 @@ class LuaBridge:
             ],
         }
 
+    # ---------- Run / Result ----------
+
     def run_file(self, path):
         with open(path, encoding="utf-8") as f:
             return self.lua.execute(f.read())
@@ -310,23 +334,39 @@ class LuaBridge:
     def value(self, name, t):
         return self.model.memoize(name, t)
 
-    def series(self):
-        """WebUI용. 모든 stock/converter의 시간별 값을 {name: [값...]}으로 돌려준다."""
+    def times(self):
         steps = int((self.model.stoptime - self.model.starttime) / self.model.dt) + 1
-        times = []
-        for i in range(steps):
-            times.append(self.model.starttime + i * self.model.dt)
+        return [self.model.starttime + i * self.model.dt for i in range(steps)]
 
+    def series(self):
+        """
+        WebUI용. 모든 stock/flow/converter의 시간별 값을 {name: [값...]}으로 돌려준다.
+        소비자 그룹이 있으면 "consumers"에 시간별 ABM 결과도 넣는다.
+        """
+        times = self.times()
         result = {}
         for name in list(self.model.stocks) + list(self.model.flows) + list(self.model.converters):
             if name.startswith("lua_"):  # _key/_stock_eq가 만든 내부 이름
                 continue
-            values = []
-            for t in times:
-                values.append(self.model.memoize(name, t))
-            result[name] = values
+            result[name] = [self.model.memoize(name, t) for t in times]
 
-        return {"time": times, "series": result}
+        output = {"time": times, "series": result}
+        if self.consumers:
+            if self.consumer_rows is None:
+                self.consumer_rows = self.consumer_series(times)
+            output["consumers"] = self.consumer_rows
+        return output
+
+    def results(self):
+        """sector/지역/SD/ABM 전체 상태를 JSON으로 바꿀 수 있는 dict로 돌려준다."""
+        return {
+            "sectors": self.factory.sectors,
+            "factories": self.factories,
+            "resources": self.resources,
+            "production_rules": self.production_rules,
+            "regions": self.chara.regions,
+            **self.series(),
+        }
 
     def map_records(self):
         """
@@ -335,25 +375,23 @@ class LuaBridge:
         현 엔진의 stock/converter는 전역 이름이므로 모든 공장이 같은 시계열을 공유한다.
         """
         result = self.series()
+        data = []
+        for i, t in enumerate(result["time"]):
+            row = {"time": int(t) if float(t).is_integer() else t}
+            for name, values in result["series"].items():
+                row[name] = values[i]
+            data.append(row)
 
         records = []
         for establishment in self.establishments:
-            factory_id = establishment["id"]
-            data = []
-            for i, t in enumerate(result["time"]):
-                row = {"time": int(t) if float(t).is_integer() else t}
-                for name, values in result["series"].items():
-                    row[name] = values[i]
-                data.append(row)
-
-            info = self.info.get(factory_id, {})
+            info = self.info.get(establishment["id"], {})
             records.append({
                 "sector": establishment["sector"],
                 "latitude": establishment["latitude"],
                 "longitude": establishment["longitude"],
-                "name": info.get("name", factory_id),
+                "name": info.get("name", establishment["id"]),
                 "country": info.get("country", ""),
-                "data": data,
+                "data": [dict(row) for row in data],
             })
 
         return records

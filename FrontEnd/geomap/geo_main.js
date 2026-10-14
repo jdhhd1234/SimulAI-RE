@@ -20,6 +20,8 @@ let geoTerritories = {};
 let geoSelectedId = null;
 let geoCompanyMarkers = [];
 let geoLocationMarkers = [];
+let geoDeposits = [];
+let geoSelectedDepositId = null;
 const hoverPopup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 12 });
 
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
@@ -52,6 +54,33 @@ map.on("load", () => {
     });
     map.on("mouseleave", "countries-fill", () => hoverPopup.remove());
     geoRefreshCountries();
+
+    // 광물/에너지 매장지: 원 크기 = 매장량(log), 광물 = 채운 원, 에너지 = 검은 원 + 흰 테두리
+    map.addSource("deposits", { type: "geojson", data: geoDepositFeatures() });
+    map.addLayer({
+        id: "deposits-circle",
+        type: "circle",
+        source: "deposits",
+        paint: {
+            "circle-radius": ["interpolate", ["linear"], ["ln", ["+", ["get", "reserve"], 1]], 0, 4, 20, 24],
+            "circle-color": ["match", ["get", "category"], "energy", "#000000", "#e6e6e6"],
+            "circle-opacity": 0.8,
+            "circle-stroke-color": "#ffffff",
+            "circle-stroke-width": ["case", ["==", ["get", "id"], ["literal", geoSelectedDepositId ?? ""]], 3, 1],
+        },
+    });
+    map.on("mousemove", "deposits-circle", (event) => {
+        const deposit = event.features[0].properties;
+        map.getCanvas().style.cursor = "pointer";
+        hoverPopup.setLngLat(event.lngLat).setText(`${deposit.name} · ${deposit.resource} · ${deposit.reserve.toLocaleString("ko-KR")}`).addTo(map);
+    });
+    map.on("mouseleave", "deposits-circle", () => {
+        map.getCanvas().style.cursor = "";
+        hoverPopup.remove();
+    });
+    map.on("click", "deposits-circle", (event) => {
+        document.dispatchEvent(new CustomEvent("geo-deposit-click", { detail: { id: event.features[0].properties.id } }));
+    });
 });
 
 map.on("error", (event) => {
@@ -63,6 +92,9 @@ map.on("error", (event) => {
 // 마커를 누르면 자산 선택(geo-company-click), 그 외 지점을 누르면 좌표 전달(geo-map-click)
 map.on("click", (event) => {
     if (event.originalEvent.target.closest(".geo-marker")) {
+        return;
+    }
+    if (map.getLayer("deposits-circle") && map.queryRenderedFeatures(event.point, { layers: ["deposits-circle"] }).length) {
         return;
     }
     const { lat, lng } = event.lngLat.wrap();
@@ -112,8 +144,31 @@ function geoPanTo(latitude, longitude) {
     map.easeTo({ center: [longitude, latitude], duration: 300 });
 }
 
+function geoDepositFeatures() {
+    return {
+        type: "FeatureCollection",
+        features: geoDeposits.map((deposit) => ({
+            type: "Feature",
+            geometry: { type: "Point", coordinates: [deposit.longitude, deposit.latitude] },
+            properties: deposit,
+        })),
+    };
+}
+
+// 매장지 목록(필터 적용된 것)과 선택된 매장지 id를 지도에 반영
+function geoSetDeposits(deposits, selectedId = null) {
+    geoDeposits = deposits;
+    geoSelectedDepositId = selectedId;
+    if (!map.getSource("deposits")) {
+        return;
+    }
+    map.getSource("deposits").setData(geoDepositFeatures());
+    map.setPaintProperty("deposits-circle", "circle-stroke-width",
+        ["case", ["==", ["get", "id"], ["literal", selectedId ?? ""]], 3, 1]);
+}
+
 // main.js(일반 모듈)에서 호출할 수 있도록 전역에 노출
-Object.assign(window, { geoSetCompanies, geoSetLocations, geoSetTerritories, geoSetSelected, geoPanTo });
+Object.assign(window, { geoSetCompanies, geoSetLocations, geoSetTerritories, geoSetSelected, geoPanTo, geoSetDeposits });
 
 /** 
  * 

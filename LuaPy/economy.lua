@@ -438,3 +438,119 @@ api.describe(
     "Cheongju Electronics Plant",
     "Korea"
 )
+
+
+-- =========================================================
+-- 8. Region (지역 특성)
+-- =========================================================
+
+local korea =
+    api.make_region("Korea")
+
+-- set_resource로 등록된 자원만 지역에 넣을 수 있다.
+api.set_region_resource(korea, "iron", 1200000)
+api.set_region_resource(korea, "coal", 800000)
+api.set_region_resource(korea, "lithium", 50000)
+
+api.set_population(
+    korea,
+    51000000,   -- total
+    0.002,      -- growth_rate
+    0.62        -- labor_ratio
+)
+
+api.set_infrastructure(
+    korea,
+    0.98,   -- power
+    0.92,   -- transport
+    0.95,   -- water
+    0.99    -- telecom
+)
+
+local korea_info =
+    api.get_region(korea)
+
+print("Korea labor_force:", korea_info.population.labor_force)
+
+
+-- =========================================================
+-- 9. Consumer ABM (10% 소득계층 소비자)
+-- =========================================================
+
+-- 실제 인구 전체를 쓰면 느려서 1/1000 표본으로 만든다.
+local consumer_groups =
+    api.make_consumer_groups(
+        korea_info.population.total / 1000,
+        300.0,   -- mean income
+        100.0,   -- std
+        10       -- groups
+    )
+
+print("consumer groups:", consumer_groups)
+
+
+-- =========================================================
+-- 10. Custom System Dynamics
+-- =========================================================
+
+-- 전체 산업 생산량
+api.make_converter("industrial_output", function(t)
+    return get("steel_production", t)
+        + get("energy_production", t)
+        + get("automobile_production", t)
+        + get("aircraft_production", t)
+        + get("electronics_production", t)
+end)
+
+-- 인프라 수준이 높을수록 생산 효율이 오른다.
+local infra = korea_info.infrastructure
+local infra_bonus = (infra.power + infra.transport + infra.water + infra.telecom) / 4
+
+api.make_converter("effective_output", function(t)
+    return get("industrial_output", t) * infra_bonus
+end)
+
+-- 철강 판매는 자동차/항공기 생산 수요만큼 (생산량을 넘지 않음)
+api.make_flow("steel_sales", function(t)
+    local demand = get("automobile_production", t) * 0.5
+        + get("aircraft_production", t) * 1.5
+    return math.min(demand, get("steel_production", t))
+end)
+
+-- 철강 재고 = 생산 - 판매 누적
+api.make_stock("steel_inventory", function(t)
+    return get("steel_production", t) - get("steel_sales", t)
+end, 0.0)
+
+
+-- =========================================================
+-- 11. WebUI 위치 마커
+-- =========================================================
+
+-- WebUI에서 추가한 위치가 있으면 첫번째 위치에 연구소를 짓는다.
+if #locations > 0 then
+    local marker = locations[1]
+
+    local lab =
+        api.sector_create_factory(
+            "electronics_lab",
+            electronics_sector,
+            marker.lat,
+            marker.lon
+        )
+
+    api.sector_factory_setting(lab, { capacity = 20 })
+    api.describe(lab, marker.name .. " Electronics Lab", "Korea")
+end
+
+
+-- =========================================================
+-- 12. 조회
+-- =========================================================
+
+local steel_summary =
+    api.sector_summary(steel_sector)
+
+print("steel factories:", steel_summary["factory_count"])
+print("steel capacity :", steel_summary["capacity"])
+print("steel_inventory t=10:", get("steel_inventory", 10))

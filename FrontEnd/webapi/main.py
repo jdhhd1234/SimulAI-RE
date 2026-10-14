@@ -1,13 +1,15 @@
+import json
 import random
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal
 
 import lupa
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import LuaPy.country_mdl as country_mdl
 from LuaPy.lua_bridge import LuaBridge
@@ -285,6 +287,87 @@ def delete_location(location_id: str):
     raise HTTPException(status_code=404, detail="Location not found")
 
 
+# 2026/10/12: 광물/에너지 매장지. UI에서 편집하고 deposits.json에 저장한다.
+# Lua 실행 때 전역 deposits 테이블로 전달된다. (필드 이름은 api.set_resource 인자와 같다)
+#   for _, d in ipairs(deposits) do
+#       api.set_resource(d.resource, d.reserve, d.extraction_capacity, d.extraction_cost, d.processing_yield)
+#   end
+DEPOSITS_PATH = Path(__file__).resolve().parent / "deposits.json"
+
+
+class DepositInput(BaseModel):
+    name: str = ""
+    category: Literal["mineral", "energy"] = "mineral"
+    resource: str
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+    reserve: float = Field(0, ge=0)
+    extraction_capacity: float = Field(0, ge=0)
+    extraction_cost: float = Field(0, ge=0)
+    processing_yield: float = Field(1.0, ge=0)
+
+
+def _load_deposits():
+    if DEPOSITS_PATH.is_file():
+        return json.loads(DEPOSITS_PATH.read_text(encoding="utf-8"))
+    return []
+
+
+def _save_deposits():
+    DEPOSITS_PATH.write_text(json.dumps(deposits, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+deposits = _load_deposits()
+deposits_lock = threading.Lock()
+
+
+def _deposit_record(deposit_id, deposit_input):
+    record = deposit_input.model_dump()
+    record["resource"] = record["resource"].strip()
+    if not record["resource"]:
+        raise HTTPException(status_code=422, detail="resource is required")
+    record["name"] = record["name"].strip() or f"{record['resource']} {deposit_id}"
+    return {"id": deposit_id, **record}
+
+
+@app.get("/deposits")
+def get_deposits():
+    with deposits_lock:
+        return list(deposits)
+
+
+@app.post("/deposits")
+def add_deposit(deposit_input: DepositInput):
+    with deposits_lock:
+        numbers = [int(d["id"].rsplit("-", 1)[-1]) for d in deposits if d["id"].rsplit("-", 1)[-1].isdigit()]
+        deposit = _deposit_record(f"dep-{max(numbers, default=0) + 1}", deposit_input)
+        deposits.append(deposit)
+        _save_deposits()
+    return deposit
+
+
+@app.put("/deposits/{deposit_id}")
+def update_deposit(deposit_id: str, deposit_input: DepositInput):
+    with deposits_lock:
+        for index, deposit in enumerate(deposits):
+            if deposit["id"] == deposit_id:
+                deposits[index] = _deposit_record(deposit_id, deposit_input)
+                _save_deposits()
+                return deposits[index]
+    raise HTTPException(status_code=404, detail="Deposit not found")
+
+
+@app.delete("/deposits/{deposit_id}")
+def delete_deposit(deposit_id: str):
+    with deposits_lock:
+        for index, deposit in enumerate(deposits):
+            if deposit["id"] == deposit_id:
+                deleted = deposits.pop(index)
+                _save_deposits()
+                return deleted
+    raise HTTPException(status_code=404, detail="Deposit not found")
+
+
 @app.post("/lua/run/{name}")
 def run_lua(
     name: str,
@@ -301,6 +384,9 @@ def run_lua(
         with locations_lock:
             saved_locations = list(locations)
         bridge.set_locations(saved_locations)
+        with deposits_lock:
+            saved_deposits = [dict(deposit) for deposit in deposits]
+        bridge.lua.globals()["deposits"] = bridge.lua.table_from(saved_deposits, recursive=True)
         bridge.run_file(str(path))
         result = bridge.series()
         records = bridge.map_records() if to_map else []

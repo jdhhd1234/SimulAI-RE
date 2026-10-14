@@ -1,8 +1,6 @@
 from BPTK_Py import Model
 from BPTK_Py import sd_functions as sd
 
-import calc.dynamics_system.dynamic_model as dynamic_model
-
 class SystemDynamicSector:
 
     def __init__(self):
@@ -135,9 +133,8 @@ class SystemDynamicSector:
         """
         2026/09/27: 공장을 특정 좌표에 건설한다.
         ## Parameters
-        - xpos
-        - ypos
-        - sector_type
+        - factory_name
+        - sector (sector 이름)
         
         ## Engine Dynamic calculate
         - month_product
