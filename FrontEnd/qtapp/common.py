@@ -5,32 +5,59 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView
 
 # 지도/Lua 화면 공용 함수 (흑백 테마) (구 main/common.js)
-BG = "#000000"
-PANEL = "#0d0d0d"
-LINE = "#262626"
-MUTED = "#7a7a7a"
-TEXT = "#e6e6e6"
+# 2026/10/17: 흑백 → 시나리오 편집기 스타일 (남색 계열 어두운 배경 + 둥근 카드)
+BG = "#0e1014"
+PANEL = "#1b1f26"
+INPUT = "#14171c"
+LINE = "#2b313b"
+SELECT = "#2c3644"
+MUTED = "#8a93a3"
+TEXT = "#d5dae2"
 STRONG = "#ffffff"
+ACCENT = "#8ab4f8"
+DANGER = "#f28b82"
 
 GRAYS = ["#ffffff", "#b3b3b3", "#808080", "#5c5c5c"]
 DASHES = [Qt.SolidLine, Qt.DashLine, Qt.DotLine, Qt.DashDotLine]
 
+# QGroupBox와 QFrame#card는 모두 둥근 카드로 그린다.
 STYLE_SHEET = f"""
 * {{ font-family: "Segoe UI", "Malgun Gothic"; font-size: 13px; }}
-QWidget {{ background: {BG}; color: {TEXT}; }}
-QTabWidget::pane {{ border-top: 1px solid {LINE}; }}
-QTabBar::tab {{ background: {BG}; color: {MUTED}; padding: 6px 14px; border: 1px solid transparent; }}
-QTabBar::tab:selected, QTabBar::tab:hover {{ color: {STRONG}; border-color: {LINE}; }}
-QGroupBox {{ border: 1px solid {LINE}; margin-top: 18px; padding: 8px; }}
-QGroupBox::title {{ subcontrol-origin: margin; left: 8px; color: {STRONG}; font-weight: 600; }}
-QLineEdit, QDoubleSpinBox, QComboBox, QPlainTextEdit, QListWidget, QTableWidget {{
-    background: {PANEL}; border: 1px solid {LINE}; padding: 3px;
+QWidget {{ background: transparent; color: {TEXT}; }}
+QMainWindow {{ background: {BG}; }}
+QFrame#card, QGroupBox {{ background: {PANEL}; border: 1px solid {LINE}; border-radius: 10px; }}
+QGroupBox {{ margin-top: 0; padding: 34px 8px 8px 8px; }}
+QGroupBox::title {{
+    subcontrol-origin: padding; subcontrol-position: top left; left: 12px; top: 10px;
+    color: {STRONG}; font-weight: 700; font-size: 14px;
 }}
-QPushButton {{ background: {PANEL}; border: 1px solid {LINE}; padding: 4px 10px; }}
-QPushButton:hover {{ background: {LINE}; color: {STRONG}; }}
+QFrame#divider {{ background: {LINE}; border: 0; max-height: 1px; min-height: 1px; }}
+QLabel#title {{ color: {STRONG}; font-size: 20px; font-weight: 800; }}
+QLabel#logo {{ color: {ACCENT}; font-size: 20px; }}
+QLabel#badge {{ background: #2c3340; color: {TEXT}; border-radius: 10px; padding: 3px 10px; font-weight: 600; }}
+QLabel[accent="true"] {{ color: {ACCENT}; font-weight: 600; }}
+QLineEdit, QDoubleSpinBox, QComboBox, QPlainTextEdit, QListWidget, QTableWidget {{
+    background: {INPUT}; border: 1px solid {LINE}; border-radius: 6px; padding: 3px;
+}}
+QLineEdit:focus, QDoubleSpinBox:focus, QComboBox:focus, QPlainTextEdit:focus {{ border-color: {ACCENT}; }}
+QComboBox QAbstractItemView {{ background: {PANEL}; border: 1px solid {LINE}; selection-background-color: {SELECT}; }}
+QToolTip {{ background: {PANEL}; color: {TEXT}; border: 1px solid {LINE}; padding: 4px; }}
+QPushButton {{ background: #262c36; border: 1px solid {LINE}; border-radius: 6px; padding: 6px 12px; }}
+QPushButton:hover {{ background: #344052; color: {STRONG}; }}
 QPushButton:disabled {{ color: {MUTED}; }}
-QListWidget::item:selected, QTableWidget::item:selected {{ background: {LINE}; color: {STRONG}; }}
-QHeaderView::section {{ background: {PANEL}; color: {MUTED}; border: 0; border-bottom: 1px solid {LINE}; padding: 3px; }}
+QPushButton#tab {{ background: transparent; border: 0; color: {MUTED}; font-size: 14px; font-weight: 600; padding: 8px 12px; }}
+QPushButton#tab:hover {{ color: {TEXT}; }}
+QPushButton#tab:checked {{ background: {SELECT}; color: {ACCENT}; }}
+QPushButton#primary {{ background: {SELECT}; border: 0; color: {STRONG}; font-size: 14px; font-weight: 700; padding: 8px 16px; }}
+QPushButton#primary:hover {{ background: #344052; color: {ACCENT}; }}
+QListWidget#nav {{ background: transparent; border: 0; }}
+QListWidget#nav::item {{ padding: 7px 8px; border-radius: 6px; }}
+QListWidget#nav::item:hover {{ background: #232934; }}
+QListWidget::item {{ padding: 3px; }}
+QListWidget::item:selected, QTableWidget::item:selected {{ background: {SELECT}; color: {ACCENT}; }}
+QHeaderView::section {{ background: {INPUT}; color: {MUTED}; border: 0; border-bottom: 1px solid {LINE}; padding: 3px; }}
+QSplitter::handle:horizontal {{ width: 10px; }}
+QScrollArea {{ border: 0; }}
 QLabel[muted="true"] {{ color: {MUTED}; }}
 QScrollBar {{ background: {BG}; width: 10px; height: 10px; }}
 QScrollBar::handle {{ background: {LINE}; min-height: 20px; min-width: 20px; }}

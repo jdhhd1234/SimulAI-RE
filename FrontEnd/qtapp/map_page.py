@@ -1,10 +1,10 @@
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QFormLayout, QGridLayout, QSplitter, QScrollArea,
-    QGroupBox, QLabel, QLineEdit, QComboBox, QDoubleSpinBox, QPushButton, QListWidget, QListWidgetItem,
+    QWidget, QHBoxLayout, QVBoxLayout, QFormLayout, QGridLayout, QSplitter, QScrollArea, QStackedWidget,
+    QFrame, QSizePolicy, QGroupBox, QLabel, QLineEdit, QComboBox, QDoubleSpinBox, QPushButton, QListWidget, QListWidgetItem,
 )
 
-from FrontEnd.qtapp.common import fmt, make_plot, render_line_chart, make_table, render_table
+from FrontEnd.qtapp.common import MUTED, fmt, make_plot, render_line_chart, make_table, render_table
 from FrontEnd.qtapp.geomap import GeoMap
 
 # 지도 화면 (구 main/main.js + company.js + location.js + deposit.js)
@@ -17,6 +17,8 @@ RESOURCE_PRESETS = {
     "oil": "energy", "gas": "energy", "coal": "energy", "uranium": "energy", "carbon": "energy",
 }
 REFRESH_MS = 3000
+# 왼쪽 시나리오 항목 (_build_side의 pages 순서와 같다)
+SIDE_SECTIONS = ["세력 · 객체 (자산)", "세계 및 환경 (위치)", "자원 · 시설 (매장지)"]
 
 
 def _spin(minimum, maximum, value=0.0, decimals=4):
@@ -32,7 +34,7 @@ def _render_metrics(grid, values):
     while grid.count():
         grid.takeAt(0).widget().deleteLater()
     for i, (key, value) in enumerate(values.items()):
-        cell = QLabel(f"<span style='color:#7a7a7a'>{key}</span><br><b>{fmt(value)}</b>")
+        cell = QLabel(f"<span style='color:{MUTED}'>{key}</span><br><b>{fmt(value)}</b>")
         grid.addWidget(cell, i // 2, i % 2)
 
 
@@ -49,9 +51,9 @@ class MapPage(QWidget):
         self.map = GeoMap()
         splitter = QSplitter(Qt.Horizontal)
         splitter.addWidget(self._build_side())
-        splitter.addWidget(self.map)
+        splitter.addWidget(self._build_map())
         splitter.addWidget(self._build_panel())
-        splitter.setSizes([300, 900, 380])
+        splitter.setSizes([330, 870, 380])
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(splitter)
@@ -70,8 +72,8 @@ class MapPage(QWidget):
     # ---------- 레이아웃 ----------
 
     def _build_side(self):
-        side = QWidget()
-        layout = QVBoxLayout(side)
+        # 2026/10/17: 시나리오 항목(nav)을 고르면 해당 편집 카드만 보여준다. (pages 순서 = SIDE_SECTIONS 순서)
+        pages = []
 
         # 자산
         box = QGroupBox("자산")
@@ -82,7 +84,7 @@ class MapPage(QWidget):
         delete_company.clicked.connect(self._delete_selected_company)
         box_layout.addWidget(self.company_list)
         box_layout.addWidget(delete_company)
-        layout.addWidget(box)
+        pages.append(box)
 
         # 위치 추가 (Lua locations 테이블)
         box = QGroupBox("위치 추가")
@@ -108,7 +110,7 @@ class MapPage(QWidget):
         form.addRow(add_location)
         form.addRow(self.location_list)
         form.addRow(delete_location)
-        layout.addWidget(box)
+        pages.append(box)
 
         # 2026/10/12: 광물/에너지 매장지 편집
         box = QGroupBox("광물 / 에너지 매장지")
@@ -172,24 +174,74 @@ class MapPage(QWidget):
         delete_deposit.clicked.connect(self._delete_selected_deposit)
         form.addRow(self.deposit_list)
         form.addRow(delete_deposit)
-        layout.addWidget(box)
-        layout.addStretch()
+        pages.append(box)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setWidget(side)
-        return scroll
+        nav_box = QGroupBox("시나리오")
+        nav_layout = QVBoxLayout(nav_box)
+        self.nav = QListWidget(objectName="nav")
+        self.nav.addItems(SIDE_SECTIONS)
+        self.nav.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.nav.setSizeAdjustPolicy(QListWidget.AdjustToContents)
+        self.nav.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        self.selection_label = QLabel("선택 항목: 없음")
+        self.selection_label.setProperty("muted", True)
+        nav_layout.addWidget(self.nav)
+        nav_layout.addWidget(self.selection_label)
+
+        stack = QStackedWidget()
+        for box in pages:
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            scroll.setWidget(box)
+            stack.addWidget(scroll)
+        self.nav.currentRowChanged.connect(stack.setCurrentIndex)
+        self.nav.setCurrentRow(0)
+
+        side = QWidget()
+        layout = QVBoxLayout(side)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(nav_box)
+        layout.addWidget(stack, 1)
+        return side
+
+    def _build_map(self):
+        # 2026/10/17: 지도 카드 (위: 제목/조작 안내, 아래: 커서 좌표/범례)
+        box = QFrame(objectName="card")
+        layout = QVBoxLayout(box)
+        head = QHBoxLayout()
+        title = QLabel("세계 지도")
+        title.setProperty("accent", True)
+        hint = QLabel("클릭: 좌표 입력 · 휠: 확대/축소 · 드래그: 이동")
+        hint.setProperty("muted", True)
+        head.addWidget(title)
+        head.addStretch()
+        head.addWidget(hint)
+        foot = QHBoxLayout()
+        self.cursor_label = QLabel("위도 / 경도")
+        self.cursor_label.setProperty("muted", True)
+        legend = QLabel("● 자산   ◌ 위치   ⬤ 광물   ◯ 에너지   ▒ 점유 영토")
+        legend.setProperty("muted", True)
+        foot.addWidget(self.cursor_label)
+        foot.addStretch()
+        foot.addWidget(legend)
+        layout.addLayout(head)
+        layout.addWidget(self.map, 1)
+        layout.addLayout(foot)
+        self.map.scene().sigMouseMoved.connect(self._on_map_move)
+        return box
 
     def _build_panel(self):
         panel = QWidget()
         layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
 
-        box = QGroupBox("자산 정보")
+        box = QGroupBox("속성 / 분석")
         box_layout = QVBoxLayout(box)
-        self.detail_title = QLabel("자산 정보")
+        self.detail_title = QLabel("선택 없음")
         self.detail_title.setStyleSheet("font-weight: 600; color: #ffffff;")
-        self.detail_sub = QLabel("자산을 선택하세요.")
+        self.detail_sub = QLabel("지도에서 자산을 선택하면 상세 정보가 표시됩니다.")
+        self.detail_sub.setWordWrap(True)
         self.detail_sub.setProperty("muted", True)
         self.metrics = QGridLayout()
         box_layout.addWidget(self.detail_title)
@@ -244,6 +296,8 @@ class MapPage(QWidget):
         self.selected_id = company_id
         self.render_companies(self.state.get_companies())
         self.map.set_selected(company_id)
+        self.nav.setCurrentRow(0)
+        self.selection_label.setText(f"선택 항목: {company['name']}")
 
         rows = company.get("data") or []
         self.detail_title.setText(company["name"])
@@ -266,8 +320,9 @@ class MapPage(QWidget):
             self.map.set_selected(None)
             self.chart.clear()
             _render_metrics(self.metrics, {})
-            self.detail_title.setText("자산 정보")
-            self.detail_sub.setText("자산을 선택하세요.")
+            self.detail_title.setText("선택 없음")
+            self.detail_sub.setText("지도에서 자산을 선택하면 상세 정보가 표시됩니다.")
+            self.selection_label.setText("선택 항목: 없음")
             render_table(self.table, [])
         self.refresh()
 
@@ -344,6 +399,8 @@ class MapPage(QWidget):
             inputs[key].setValue(deposit[key])
         self.deposit_submit.setText("수정")
         self.deposit_cancel.show()
+        self.nav.setCurrentRow(2)
+        self.selection_label.setText(f"선택 항목: {deposit['name']}")
         self.map.pan_to(deposit["latitude"], deposit["longitude"])
         self.render_deposits()
 
@@ -358,6 +415,7 @@ class MapPage(QWidget):
             inputs[key].setValue(value)
         self.deposit_submit.setText("추가")
         self.deposit_cancel.hide()
+        self.selection_label.setText("선택 항목: 없음")
         self.render_deposits()
 
     def _submit_deposit(self):
@@ -402,3 +460,7 @@ class MapPage(QWidget):
         self.location_lon.setValue(round(longitude, 4))
         self.deposit_inputs["latitude"].setValue(round(latitude, 4))
         self.deposit_inputs["longitude"].setValue(round(longitude, 4))
+
+    def _on_map_move(self, scene_pos):
+        pos = self.map.getViewBox().mapSceneToView(scene_pos)
+        self.cursor_label.setText(f"위도 {pos.y():.4f} / 경도 {(pos.x() + 180) % 360 - 180:.4f}")

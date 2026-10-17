@@ -16,10 +16,10 @@ from FrontEnd.qtapp.common import BG
 #   Signal: company_clicked(id), deposit_clicked(id), map_clicked(latitude, longitude)
 COUNTRIES_PATH = Path(__file__).resolve().parents[1] / "geomap" / "countries.geojson"
 
-COUNTRY_EMPTY = "#141414"
-COUNTRY_OWNED = "#3d3d3d"
-COUNTRY_SELECTED = "#8c8c8c"
-COUNTRY_LINE = "#333333"
+COUNTRY_EMPTY = "#1c222b"
+COUNTRY_OWNED = "#34404f"
+COUNTRY_SELECTED = "#5d7ca3"
+COUNTRY_LINE = "#323b47"
 
 
 class GeoMap(pg.PlotWidget):

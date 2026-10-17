@@ -43,6 +43,7 @@ class ConsumerAgent(Agent):
         self.state = self.next_state()
 
         consume = min(cash, income * CONSUME_RATE[self.state])
+
         self.set_property_value("cash", cash - consume)
         self.set_property_value("consume", consume)
 
@@ -51,7 +52,11 @@ class ConsumerAgent(Agent):
         """
         정규분포로 인구 소득을 뽑고 낮은 순으로 정렬하여 10%씩 묶어 ConsumerAgent를 만든다.
         """
-        incomes = sorted(max(0.0, random.gauss(mean, std)) for _ in range(population))
+        incomes = sorted(
+            max(0.0, random.gauss(mean, std)) 
+            for _ in range(population)
+        )
+        
         size = population // groups
         agents = []
 

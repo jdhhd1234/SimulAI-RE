@@ -32,6 +32,7 @@ class LuaPage(QWidget):
         # 실행
         side = QWidget()
         side_layout = QVBoxLayout(side)
+        side_layout.setContentsMargins(0, 0, 0, 0)
         box = QGroupBox("실행")
         form = QFormLayout(box)
         self.file_select = QComboBox()
@@ -59,6 +60,7 @@ class LuaPage(QWidget):
         # 결과
         main = QWidget()
         main_layout = QVBoxLayout(main)
+        main_layout.setContentsMargins(0, 0, 0, 0)
         box = QGroupBox("결과")
         self.chart = make_plot()
         QVBoxLayout(box).addWidget(self.chart)
