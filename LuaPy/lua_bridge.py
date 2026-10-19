@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import calc.dynamics_system.dynamic_lowlevel as dm
 import calc.dynamics_system.dynamic_sector as ds
 import calc.dynamics_system.dynamic_index as di
-import abm.abm_consumer_market as abm
+import calc.abm.abm_consumer_market as abm
 
 
 class LuaBridge:
@@ -230,7 +230,8 @@ class LuaBridge:
     def make_consumer_groups(self, population=10000, mean=300.0, std=100.0, groups=10):
         """정규분포 소득 인구를 10% 계층 소비자 그룹으로 만든다. 만든 그룹 수를 돌려준다."""
         # make_consumer_groups는 ConsumerAgent 메서드지만 self를 쓰지 않아서 클래스로 바로 부른다.
-        self.consumers = abm.ConsumerAgent.make_consumer_groups(
+        # 이 부분은 나중에 abm_company_market.py에서 make_consumer_groups라는 함수를 추가해서 할것이다 (Claude Code쓸꺼임.)
+        self.consumers = abm.Consumer.make_consumer_groups(
             None, self.model, int(population), float(mean), float(std), int(groups)
         )
         self.consumer_rows = None

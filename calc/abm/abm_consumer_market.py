@@ -1,4 +1,5 @@
 from BPTK_Py import Agent
+from BPTK_Py import Event
 from enum import Enum
 import random
 
@@ -23,16 +24,33 @@ class Consumer(Agent):
         self.income = income
         self.fixcost = fixcost
 
+        self.register_event_handler(list(ConsumerState), "normal_event", self.handle_normal_event)
+        self.register_event_handler(list(ConsumerState), "spending", self.handle_spending_event)
+        self.register_event_handler(list(ConsumerState), "saving", self.handle_saving_event)
+
         return super().initialize()
+
+    # 여기에 이제 def handle을 사용해서 위에 있는 FSM의 self.state = "spending" 이런쪽이랑 연결하기.
+
+    def handle_normal_event(self, event):
+        self.state = ConsumerState.NORMAL
+
+    def handle_spending_event(self, event):
+        self.state = ConsumerState.SPENDING
+
+    def handle_saving_event(self, event):
+        self.state = ConsumerState.SAVING
 
     def act(self, time, round_no, step_no):
 
+        # FSM
         if self.income < self.fixcost:
-            self.state = "saving"
+            event_name = "saving"
+        elif self.income > self.fixcost:
+            event_name = "spending"
+        else:
+            event_name = "normal_event"
 
-        if self.income > self.fixcost:
-            self.state = "spending"
+        self.receive_instantaneous_event(Event(event_name, self.id, self.id))
 
         return super().act(time, round_no, step_no)
-
-    # 여기에 이제 def handle을 사용해서 위에 있는 FSM의 self.state = "spending" 이런쪽이랑 연결하기.
