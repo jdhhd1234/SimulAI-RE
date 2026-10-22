@@ -16,6 +16,34 @@ class Consumer(Agent):
     state: saving(절약) / normal(보통) / spending(소비)
     """
 
+    def make_consumer_groups(self, model, population: int, mean: float, std: float, groups: int):
+
+        if not population >= groups > 0 or std < 0:
+            raise ValueError("population >= groups > 0 and std >= 0 are required")
+        
+        incomes = sorted(max(0.0, random.gauss(mean, std)) for _ in range(population))
+
+        agents = []
+
+        for i in range(groups):
+            chunk = incomes[i * population // groups:(i + 1) * population // groups]
+
+            income = sum(chunk) / len(chunk)
+
+            agent = Consumer(i, model, {
+                "decile": {"type": "Integer", "value": i + 1},
+                "population": {"type": "Integer", "value": len(chunk)},
+                "income": {"type": "Double", "value": income},
+                "cash": {"type": "Double", "value": income * 2},
+                "consume": {"type": "Double", "value": 0.0},
+            })
+
+            agent.initialize(income * 2, income, mean)
+
+            agents.append(agent)
+
+        return agents
+
     def initialize(self, money: float, income: float, fixcost: float):        
         self.agent_type = "consumer"
         self.state = ConsumerState.NORMAL
@@ -45,12 +73,18 @@ class Consumer(Agent):
 
         # FSM
         if self.income < self.fixcost:
-            event_name = "saving"
+            event_name = self.handle_saving_event(self)
         elif self.income > self.fixcost:
-            event_name = "spending"
+            event_name = self.handle_spending_event(self)
         else:
-            event_name = "normal_event"
+            event_name = self.handle_normal_event(self)
 
+        self.decision = {
+            "action": event_name,
+            "previous_state": self.state.value,
+            "income": self.income,
+            "fixcost": self.fixcost,
+        }
         self.receive_instantaneous_event(Event(event_name, self.id, self.id))
 
         return super().act(time, round_no, step_no)

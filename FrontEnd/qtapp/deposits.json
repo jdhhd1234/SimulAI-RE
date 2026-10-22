@@ -1,14 +1,1 @@
-[
-  {
-    "id": "dep-1",
-    "name": "오성철광산",
-    "category": "mineral",
-    "resource": "iron",
-    "latitude": 37.9587,
-    "longitude": 128.479,
-    "reserve": 100000.0,
-    "extraction_capacity": 1000.0,
-    "extraction_cost": 10.0,
-    "processing_yield": 1.0
-  }
-]
+[]

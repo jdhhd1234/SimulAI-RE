@@ -9,6 +9,7 @@ import calc.dynamics_system.dynamic_lowlevel as dm
 import calc.dynamics_system.dynamic_sector as ds
 import calc.dynamics_system.dynamic_index as di
 import calc.abm.abm_consumer_market as abm
+import calc.abm.abm_company_market as company_abm
 
 
 class LuaBridge:
@@ -43,6 +44,8 @@ class LuaBridge:
         self.sd = dm.SystemDynamics()
         self.consumers = []
         self.consumer_rows = None  # ABM은 상태가 있어서 한번만 진행시키고 결과를 재사용한다.
+        self.companies = {}
+        self.company_rows = None
         # 지도 API용 공장 위치 목록. 실제 저장소는 factory.factories다.
         self.establishments = []
         self.info = {}
@@ -234,11 +237,16 @@ class LuaBridge:
         self.consumers = abm.Consumer.make_consumer_groups(
             None, self.model, int(population), float(mean), float(std), int(groups)
         )
+
         self.consumer_rows = None
+
         return len(self.consumers)
 
     def consumer_series(self, times):
         """소비자 그룹을 times 순서대로 진행시키고 시간별 상태를 돌려준다."""
+        lua_times = lupa.lua_type(times) == "table"
+        if lua_times:
+            times = [times[i] for i in range(1, len(times) + 1)]
         rows = []
         for step, t in enumerate(times):
             groups = []
@@ -247,16 +255,84 @@ class LuaBridge:
                 groups.append({
                     "decile": agent.get_property_value("decile"),
                     "population": agent.get_property_value("population"),
-                    "state": agent.state,
+                    "state": agent.state.value,
                     "income": agent.get_property_value("income"),
                     "cash": agent.get_property_value("cash"),
                     "consume": agent.get_property_value("consume"),
+                    "decision": dict(agent.decision),
                 })
             rows.append({
                 "time": t,
                 "groups": groups,
                 "total_consume": sum(group["consume"] for group in groups),
             })
+        if lua_times:
+            return self.lua.table_from(rows, recursive=True)
+        return rows
+
+    def make_company(self, name):
+        if name in self.companies:
+            raise ValueError(f"company already exists: {name}")
+
+        agent = company_abm.CompanyConsumer(len(self.companies), self.model, {})
+        agent.initialize()
+        self.companies[name] = agent
+        self.company_rows = None
+        return name
+
+    def set_company(self, name, cash=None, objects=None):
+        agent = self.companies.get(name)
+        if agent is None:
+            raise ValueError(f"unknown company: {name}")
+
+        if cash is not None:
+            agent.cash = float(cash)
+
+        if objects is not None:
+            if lupa.lua_type(objects) == "table":
+                objects = [objects[i] for i in range(1, len(objects) + 1)]
+
+            items = []
+            for obj in objects:
+                items.append({"name": str(obj["name"]), "price": float(obj["price"])})
+            agent.objects = items
+
+        self.company_rows = None
+        return name
+
+    def get_company(self, name):
+        agent = self.companies.get(name)
+        if agent is None:
+            return None
+
+        return self.lua.table_from({
+            "name": name,
+            "state": agent.state,
+            "cash": agent.cash,
+            "objects": agent.objects,
+        }, recursive=True)
+
+    def company_series(self, times):
+        lua_times = lupa.lua_type(times) == "table"
+        if lua_times:
+            times = [times[i] for i in range(1, len(times) + 1)]
+
+        rows = []
+        for step, t in enumerate(times):
+            companies = []
+            for name, agent in self.companies.items():
+                agent.act(t, step, 0)
+                companies.append({
+                    "name": name,
+                    "state": agent.state,
+                    "cash": agent.cash,
+                    "objects": [dict(obj) for obj in agent.objects],
+                    "decisions": [dict(item) for item in agent.decisions],
+                })
+            rows.append({"time": t, "companies": companies})
+
+        if lua_times:
+            return self.lua.table_from(rows, recursive=True)
         return rows
 
     # ---------- SD ----------
@@ -356,6 +432,10 @@ class LuaBridge:
             if self.consumer_rows is None:
                 self.consumer_rows = self.consumer_series(times)
             output["consumers"] = self.consumer_rows
+        if self.companies:
+            if self.company_rows is None:
+                self.company_rows = self.company_series(times)
+            output["companies"] = self.company_rows
         return output
 
     def results(self):

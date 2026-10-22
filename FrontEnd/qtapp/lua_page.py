@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 
 from FrontEnd.qtapp.common import fmt, make_plot, render_line_chart, make_table, render_table
 from FrontEnd.qtapp.state import LuaRunError
+from FrontEnd.qtapp.debug_window import DebugWindow
 
 # Lua 실행 화면 (구 lua/lua.js). Lua 코드는 LuaPy/*.lua 파일로 작성하고, 여기서는 실행과 결과 표시만 한다.
 SECTOR_COLUMNS = ["섹터", "생산 규칙", "공장 수", "capacity", "위치"]
@@ -27,6 +28,7 @@ class LuaPage(QWidget):
     def __init__(self, state):
         super().__init__()
         self.state = state
+        self.debug_window = DebugWindow(self)
         mono = QFontDatabase.systemFont(QFontDatabase.FixedFont)
 
         # 실행
@@ -48,6 +50,9 @@ class LuaPage(QWidget):
         form.addRow("dt", self.dt)
         form.addRow(self.to_map)
         form.addRow(self.run_button)
+        self.debug_button = QPushButton("분석 / AI 디버깅")
+        self.debug_button.clicked.connect(self.open_debug)
+        form.addRow(self.debug_button)
         side_layout.addWidget(box)
 
         box = QGroupBox("콘솔")
@@ -88,6 +93,11 @@ class LuaPage(QWidget):
 
         self.file_select.currentTextChanged.connect(self.load_source)
         self.load_files()
+
+    def open_debug(self):
+        self.debug_window.show()
+        self.debug_window.raise_()
+        self.debug_window.activateWindow()
 
     def load_files(self):
         names = self.state.lua_files()
@@ -131,12 +141,14 @@ class LuaPage(QWidget):
             )
         except LuaRunError as error:
             self.render_console(error.console, str(error))
+            self.debug_window.show_error(str(error))
             self.status.emit(str(error), True)
             return
         finally:
             self.run_button.setEnabled(True)
 
         self.render_console(result["console"])
+        self.debug_window.set_result(result, name)
         render_line_chart(self.chart, result["time"], result["series"])
         self.render_sectors(result["sectors"])
         if result["company_ids"]:
