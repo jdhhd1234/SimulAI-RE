@@ -47,44 +47,38 @@ class Consumer(Agent):
     def initialize(self, money: float, income: float, fixcost: float):        
         self.agent_type = "consumer"
         self.state = ConsumerState.NORMAL
-
+        
         self.money = money
         self.income = income
         self.fixcost = fixcost
 
-        self.register_event_handler(list(ConsumerState), "normal_event", self.handle_normal_event)
-        self.register_event_handler(list(ConsumerState), "spending", self.handle_spending_event)
-        self.register_event_handler(list(ConsumerState), "saving", self.handle_saving_event)
+        for state in ConsumerState:
+            self.register_event_handler(list(ConsumerState), state.value, self.handle_state_event)
 
         return super().initialize()
 
     # 여기에 이제 def handle을 사용해서 위에 있는 FSM의 self.state = "spending" 이런쪽이랑 연결하기.
 
-    def handle_normal_event(self, event):
-        self.state = ConsumerState.NORMAL
-
-    def handle_spending_event(self, event):
-        self.state = ConsumerState.SPENDING
-
-    def handle_saving_event(self, event):
-        self.state = ConsumerState.SAVING
+    def handle_state_event(self, event):
+        self.state = ConsumerState(event.name)
 
     def act(self, time, round_no, step_no):
 
-        # FSM
+        # FSM AI
         if self.income < self.fixcost:
-            event_name = self.handle_saving_event(self)
+            new_state = ConsumerState.SAVING
         elif self.income > self.fixcost:
-            event_name = self.handle_spending_event(self)
+            new_state = ConsumerState.SPENDING
         else:
-            event_name = self.handle_normal_event(self)
+            new_state = ConsumerState.NORMAL
 
         self.decision = {
-            "action": event_name,
+            "action": new_state.value,
             "previous_state": self.state.value,
             "income": self.income,
             "fixcost": self.fixcost,
         }
-        self.receive_instantaneous_event(Event(event_name, self.id, self.id))
+
+        self.receive_instantaneous_event(Event(new_state.value, self.id, self.id))
 
         return super().act(time, round_no, step_no)

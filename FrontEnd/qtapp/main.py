@@ -36,47 +36,40 @@ class MainWindow(QMainWindow):
         self.pages.addWidget(self.map_page)
         self.pages.addWidget(self.lua_page)
 
-        # 헤더: 제목 / 구분선 / 단계 탭 + 상태
+        # 2026/10/23: 헤더 + 하단 실행 바 → 상단 HUD 한 줄 (제목 / 수치 칩 / 단계 탭 / 상태 + 실행)
         header = QFrame(objectName="card")
-        header_layout = QVBoxLayout(header)
-        header_layout.setContentsMargins(16, 12, 16, 12)
-        title_row = QHBoxLayout()
-        title_row.addWidget(QLabel("◎", objectName="logo"))
-        title_row.addWidget(QLabel("SIMULAI-RE", objectName="title"))
-        title_row.addWidget(QLabel("시나리오 편집기", objectName="badge"))
-        title_row.addStretch()
-        header_layout.addLayout(title_row)
-        header_layout.addWidget(QFrame(objectName="divider"))
-        tab_row = QHBoxLayout()
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(12, 8, 12, 8)
+        header_layout.addWidget(QLabel("◎", objectName="logo"))
+        header_layout.addWidget(QLabel("SIMULAI-RE", objectName="title"))
+        header_layout.addWidget(QLabel("시나리오 편집기", objectName="badge"))
+        header_layout.addSpacing(16)
+        # 자산 / 위치 / 매장지 개수 (set_status 때 갱신)
+        self.stats = {key: QLabel(objectName="stat") for key in ("자산", "위치", "매장지")}
+        for label in self.stats.values():
+            header_layout.addWidget(label)
+        header_layout.addStretch()
         self.tab_group = QButtonGroup(self)
         for i, label in enumerate(TABS):
             button = QPushButton(label, objectName="tab", checkable=True, checked=i == 0)
             self.tab_group.addButton(button, i)
-            tab_row.addWidget(button)
+            header_layout.addWidget(button)
         self.tab_group.idClicked.connect(self.pages.setCurrentIndex)
-        tab_row.addStretch()
-        self.chip = QLabel("준비 중", objectName="badge")
-        tab_row.addWidget(self.chip)
-        header_layout.addLayout(tab_row)
-
-        # 하단 실행 바: 상태 메시지 + 시뮬레이션 실행
-        footer = QFrame(objectName="card")
-        footer_layout = QHBoxLayout(footer)
-        footer_layout.setContentsMargins(16, 8, 12, 8)
+        header_layout.addStretch()
         self.status_label = QLabel("시뮬레이션 준비 상태")
+        self.chip = QLabel("준비 중", objectName="badge")
         run_button = QPushButton("▶  시뮬레이션 실행", objectName="primary")
         run_button.clicked.connect(self.run_simulation)
-        footer_layout.addWidget(self.status_label)
-        footer_layout.addStretch()
-        footer_layout.addWidget(run_button)
+        header_layout.addWidget(self.status_label)
+        header_layout.addWidget(self.chip)
+        header_layout.addWidget(run_button)
 
         central = QWidget()
         layout = QVBoxLayout(central)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(8)
         layout.addWidget(header)
         layout.addWidget(self.pages, 1)
-        layout.addWidget(footer)
         self.setCentralWidget(central)
 
         for page in (self.map_page, self.lua_page):
@@ -87,6 +80,9 @@ class MainWindow(QMainWindow):
     def set_status(self, message, is_error=False):
         self.status_label.setStyleSheet(f"color: {DANGER if is_error else MUTED};")
         self.status_label.setText(message)
+        counts = {"자산": len(self.state.get_companies()), "위치": len(self.state.locations), "매장지": len(self.state.deposits)}
+        for key, label in self.stats.items():
+            label.setText(f"<span style='color:{MUTED}; font-size:11px'>{key}</span>&nbsp; {counts[key]:,}")
         # 상태 표시는 Lua 실행 결과만 반영한다 (지도 화면의 주기적 메시지는 무시)
         if is_error:
             self.chip.setText("오류")

@@ -16,10 +16,11 @@ from FrontEnd.qtapp.common import BG
 #   Signal: company_clicked(id), deposit_clicked(id), map_clicked(latitude, longitude)
 COUNTRIES_PATH = Path(__file__).resolve().parents[1] / "geomap" / "countries.geojson"
 
-COUNTRY_EMPTY = "#1c222b"
-COUNTRY_OWNED = "#34404f"
-COUNTRY_SELECTED = "#5d7ca3"
-COUNTRY_LINE = "#323b47"
+COUNTRY_EMPTY = "#202122"
+COUNTRY_OWNED = "#4a3d26"
+COUNTRY_SELECTED = "#8a6a2e"
+COUNTRY_LINE = "#3a3a36"
+MARKER = "#e3a83b"
 
 
 class GeoMap(pg.PlotWidget):
@@ -103,8 +104,8 @@ class GeoMap(pg.PlotWidget):
             spots.append({
                 "pos": (company["longitude"], company["latitude"]),
                 "size": 14 if active else 8,
-                "brush": pg.mkBrush("#ffffff" if active else "#000000"),
-                "pen": pg.mkPen("#ffffff", width=1),
+                "brush": pg.mkBrush(MARKER if active else "#000000"),
+                "pen": pg.mkPen(MARKER, width=2 if active else 1),
                 "data": company["id"],
             })
         self.company_points.setData(spots)

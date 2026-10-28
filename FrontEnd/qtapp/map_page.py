@@ -1,6 +1,6 @@
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QFormLayout, QGridLayout, QSplitter, QScrollArea, QStackedWidget,
+    QWidget, QHBoxLayout, QVBoxLayout, QFormLayout, QGridLayout, QScrollArea, QStackedWidget,
     QFrame, QSizePolicy, QGroupBox, QLabel, QLineEdit, QComboBox, QDoubleSpinBox, QPushButton, QListWidget, QListWidgetItem,
 )
 
@@ -49,14 +49,23 @@ class MapPage(QWidget):
         self.company_ids = []
 
         self.map = GeoMap()
-        splitter = QSplitter(Qt.Horizontal)
-        splitter.addWidget(self._build_side())
-        splitter.addWidget(self._build_map())
-        splitter.addWidget(self._build_panel())
-        splitter.setSizes([330, 870, 380])
-        layout = QHBoxLayout(self)
+        # 2026/10/23: 지도를 화면 전체에 깔고 편집(왼쪽) / 속성(오른쪽) 패널을 지도 위에 겹쳐 띄운다.
+        #   같은 격자 칸에 겹쳐 넣으면 나중에 넣은 위젯이 위에 그려진다.
+        self.side_panel = self._build_side()
+        self.side_panel.setFixedWidth(340)
+        self.info_panel = self._build_panel()
+        self.info_panel.setFixedWidth(380)
+        head, foot = self._build_map()
+        layout = QGridLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(splitter)
+        layout.setSpacing(0)
+        layout.addWidget(self.map, 0, 0, 3, 3)
+        layout.addWidget(self.side_panel, 0, 0, 3, 1)
+        layout.addWidget(self.info_panel, 0, 2, 3, 1)
+        layout.addWidget(head, 0, 1, Qt.AlignTop | Qt.AlignHCenter)
+        layout.addWidget(foot, 2, 1, Qt.AlignBottom | Qt.AlignHCenter)
+        layout.setRowStretch(1, 1)
+        layout.setColumnStretch(1, 1)
 
         self.map.company_clicked.connect(self.select_company)
         self.map.deposit_clicked.connect(self.edit_deposit)
@@ -200,46 +209,46 @@ class MapPage(QWidget):
 
         side = QWidget()
         layout = QVBoxLayout(side)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(12, 12, 0, 12)
         layout.addWidget(nav_box)
         layout.addWidget(stack, 1)
         return side
 
     def _build_map(self):
         # 2026/10/17: 지도 카드 (위: 제목/조작 안내, 아래: 커서 좌표/범례)
-        box = QFrame(objectName="card")
-        layout = QVBoxLayout(box)
-        head = QHBoxLayout()
+        # 2026/10/23: 지도 위에 뜨는 위/아래 HUD 카드로 변경. 위 카드에는 패널 표시 토글을 둔다.
+        head = QFrame(objectName="hud")
+        head_layout = QHBoxLayout(head)
         title = QLabel("세계 지도")
         title.setProperty("accent", True)
         hint = QLabel("클릭: 좌표 입력 · 휠: 확대/축소 · 드래그: 이동")
         hint.setProperty("muted", True)
-        head.addWidget(title)
-        head.addStretch()
-        head.addWidget(hint)
-        foot = QHBoxLayout()
+        head_layout.addWidget(title)
+        head_layout.addWidget(hint)
+        for label, panel in (("편집", self.side_panel), ("속성", self.info_panel)):
+            toggle = QPushButton(label, objectName="tab", checkable=True, checked=True)
+            toggle.toggled.connect(panel.setVisible)
+            head_layout.addWidget(toggle)
+        foot = QFrame(objectName="hud")
+        foot_layout = QHBoxLayout(foot)
         self.cursor_label = QLabel("위도 / 경도")
-        self.cursor_label.setProperty("muted", True)
+        self.cursor_label.setMinimumWidth(220)
         legend = QLabel("● 자산   ◌ 위치   ⬤ 광물   ◯ 에너지   ▒ 점유 영토")
         legend.setProperty("muted", True)
-        foot.addWidget(self.cursor_label)
-        foot.addStretch()
-        foot.addWidget(legend)
-        layout.addLayout(head)
-        layout.addWidget(self.map, 1)
-        layout.addLayout(foot)
+        foot_layout.addWidget(self.cursor_label)
+        foot_layout.addWidget(legend)
         self.map.scene().sigMouseMoved.connect(self._on_map_move)
-        return box
+        return head, foot
 
     def _build_panel(self):
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(0, 12, 12, 12)
 
         box = QGroupBox("속성 / 분석")
         box_layout = QVBoxLayout(box)
         self.detail_title = QLabel("선택 없음")
-        self.detail_title.setStyleSheet("font-weight: 600; color: #ffffff;")
+        self.detail_title.setStyleSheet("font-weight: 800; font-size: 16px; color: #ffffff;")
         self.detail_sub = QLabel("지도에서 자산을 선택하면 상세 정보가 표시됩니다.")
         self.detail_sub.setWordWrap(True)
         self.detail_sub.setProperty("muted", True)
